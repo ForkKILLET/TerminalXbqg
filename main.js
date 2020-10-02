@@ -54,9 +54,9 @@ function writeJSON(path, data) {
     })
 }
 
-async function ajax(tar) {
+async function ajax(url, charset) {
    return new Promise((resolve, reject) => {
-        http.get(tar, res => {
+        http.get(url, res => {
             const { statusCode } = res
             const contentType = res.headers['content-type']
             
@@ -64,12 +64,11 @@ async function ajax(tar) {
                 res.resume()
                 reject(new Error(`ajax: Request failed.\n` + 
                     `Status Code: ${statusCode}\n` +
-                    `URL: ${tar}`
+                    `URL: ${url}`
                 ))
             }
 
             let data = ""
-            res.setEncoding("utf8")
             res.on("data", chunk => data += chunk)
             res.on("end", () => resolve(data))
         })
@@ -129,7 +128,8 @@ function fetchAlias(name) {
 }
 
 const verbs = {
-    // Note: alias
+    // :::: alias
+
     "[":    "prev",
     "=":    "curr",
     "]":    "next",
@@ -141,20 +141,24 @@ const verbs = {
     "?":    "help",
     "%":    "config",
 
-    // Note: work
+    // :::: work
 
     fetch: async(page) => {
         page = page ?? args[1]
         if (!page) Err("fetch: Page can't be null.")
 
-        const _html = await ajax(setting.src
-            ?? `https://www.xsbiquge.com/${page}.html`)
+        const srcName = setting.sourceActive, src = setting.sources[srcName]
+        const _html = await ajax(src.url.replace(/\{page\}/g, page))
+
         let _title = _html.match(/<title>(.*)<\/title>/)[1]
         if (_title.match(/^[3-5][01]\d+/))
             Err(`fetch: HTTP error code: ${_title}`)
         _title = _title.replace(/ - 新笔趣阁.*/, "").replace("-", " @ ")
         const _content = _html.match(/<div id="content">(.*)<\/div>/)[1]
-            .replace(/<br[ ][\/]>/g, "\n").replace(/&nbsp;/g, " ")
+            .replace(/<br[ ][\/]>/g, "\n")
+            .replace(/readx\(\);/g, "")
+            .replace(/&amp;/g, "&")
+            .replace(/&nbsp;/g, " ")
         div("text", 1, 2)
         Log(_title, "\n", _content)
 
@@ -293,10 +297,16 @@ const verbs = {
 
 async function init() {
     const configDft = {
-        setting:    "{}",
-        arround:    "{}",
-        books:      "{}",
-        pagewarning:   "{}"
+        setting:        {
+            warningPageNum: 0xffff,
+            sourceActive: "xbqg",
+            sources: {
+                xbqg: { url: "https://www.xsbiquge.com/{page}.html", charset: "utf8" }
+            }
+        },
+        arround:        {},
+        books:          {},
+        pagewarning:    {}
     }
     for (let i in configDft)
         if (! await existFile(`${p_data}/${i}.json`))
