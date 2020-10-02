@@ -4,17 +4,23 @@
 
 const fs    = require("fs")
 const http  = require("https") // Note: Xbqg refuses http requests.
+require("fkutil") // TODO: refactor with it
 
 // :: Tool
 
 const debug = false
 
+function Warn(m) {
+    console.warn(`\x1B[33m${m}\x1B[0m`)
+}
 function Err(m) {
     m = `\x1B[31m${m}\x1B[0m`
     if (debug) throw m
     else console.error(m)
+    div("EOF", 1, 0)
     process.exit()
 }
+function Log(...m) { console.log(...m) }
 
 function existFile(path) {
     return new Promise(resolve =>
@@ -112,11 +118,11 @@ function fetchAlias(name) {
         div("page info", 0, 2)
         arround = await readConfig("arround")
         if (arround[name]) {
-            console.log(`${name}: ${arround[name]}`)
+            Log(`${name}: ${arround[name]}`)
             verbs.fetch(arround[name])
         }
         else {
-            console.log(`${name}: null`)
+            Log(`${name}: null`)
             div("EOF", 1, 1)
         }
     }
@@ -141,7 +147,7 @@ const verbs = {
         page = page ?? args[1]
         if (!page) Err("fetch: Page can't be null.")
 
-        const _html = await ajax(setting?.src
+        const _html = await ajax(setting.src
             ?? `https://www.xsbiquge.com/${page}.html`)
         let _title = _html.match(/<title>(.*)<\/title>/)[1]
         if (_title.match(/^[3-5][01]\d+/))
@@ -150,7 +156,7 @@ const verbs = {
         const _content = _html.match(/<div id="content">(.*)<\/div>/)[1]
             .replace(/<br[ ][\/]>/g, "\n").replace(/&nbsp;/g, " ")
         div("text", 1, 2)
-        console.log(_title, "\n", _content)
+        Log(_title, "\n", _content)
 
         div("arround", 1, 2)
         const
@@ -164,14 +170,32 @@ const verbs = {
     "next": ${_next ? '"' + _next + '"' : "null"},
     "title": "${_title}"
 }\n`
-        console.log(arroundJSON)
+        Log(arroundJSON)
         await writeConfig("arround", arroundJSON)
+
+        const pagewarning = await readConfig("pagewarning")
+        const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
+        // WwW: I don't think anyone can read these pages one day.
+        const Wnum = setting.warningPageNum ?? 0xffff
+
+        if (pagewarning.date !== today) {
+            pagewarning.date = today
+            pagewarning.num = 0
+        }
+        else pagewarning.num++
+        if (pagewarning.num >= Wnum) {
+            div("page number warning", 0, 2)
+            Warn(`You have reached the warning page number ${Wnum}.\nPage now: ${pagewarning.num}.\nSuggestion: stop.\n`)
+        }
+
+        await writeConfig("pagewarning", pagewarning)
+
         div("EOF", 0, 1)
     },
 
     help: () => {
         div("help", 0, 2)
-        console.log("Nothing here, at least not now.")
+        Warn("Nothing here, at least not now.")
         div("EOF", 1, 1)
     },
 
@@ -181,14 +205,14 @@ const verbs = {
 
     arround: async() => {
         div("arround", 0, 2)
-        console.log(await readConfig("arround", true))
+        Log(await readConfig("arround", true))
         div("EOF", 0, 1)
     },
 
     bookcase: async() => {
         div("bookcase", 0, 2)
         // TODO: better display
-        console.log(await readConfig("books", true))
+        Log(await readConfig("books", true))
         div("EOF", 1, 1) 
     },
 
@@ -203,7 +227,7 @@ const verbs = {
         await writeConfig("books", books)
 
         div("bookmark", 0, 1)
-        console.log(newBook ? "Added." : "Updated.")
+        Log(newBook ? "Added." : "Updated.")
         div("EOF", 0, 1)
     },
 
@@ -214,18 +238,18 @@ const verbs = {
         div("bookfetch", 0, 2)
         const books = await readConfig("books")
         for (let i in books) if (name === i || name === books[i].name) {
-            console.log("Succeeded.")
+            Log("Succeeded.")
             await verbs.fetch(books[i].curr)
             return
         }
-        console.log("Not found.")
+        Warn("Not found.")
         div("EOF", 1, 1)
     },
 
     config: async() => {
         if (args[1] == null) {
             div("config list global", 0, 2)
-            console.log(await readConfig("setting", true))
+            Log(JSON.stringify(setting, null, 4))
             div("EOF", 1, 1)
         }
         else {
@@ -233,12 +257,11 @@ const verbs = {
 
             div(W ? "config write" : "config read", 0, 2)
 
-            let config = await readConfig("setting"),
-                path = args[1]
+            let path = args[1]
             if (path[0] !== "." && path[0] !== "[") path = "." + path
 
             const rsit = path.matchAll(/\.([_a-zA-Z][0-9_a-zA-Z]*)|\[(\d+)]/g)
-            let rs, c = config, pa, f = true, t, key
+            let rs, c = setting, pa, f = true, t, key
             while (! (rs = rsit.next()).done) {
                 t = !! rs.value[1], key = t ? rs.value[1] : Number(rs.value[2])
                 if (c && typeof c === "object") {
@@ -248,21 +271,21 @@ const verbs = {
                         c = pa[key]
                     }
                     else {
-                        if (W) Err("c: Path type conflicted.")
-                        console.log(undefined)
+                        if (W) Err("config: Path type conflicted.")
+                        Log(undefined)
                         f = false; break
                     }
                 }
                 else if (c === undefined) W && (c = pa[key] = (t ? {} : []))
-                else W && Err("c: Path type conflicted.")
+                else W && Err("config: Path type conflicted.")
             }
             if (W) {
                 pa[key] = [ "undefined", "x" ].includes(args[2])
                     ? undefined
                     : JSON.parse(args[2][0] === "=" ? '"' + args[2].slice(1) + '"' : args[2])
-                await writeConfig("setting", config)
+                await writeConfig("setting", setting)
             }
-            if (f) console.log(JSON.stringify(W ? config : c, null, 4))
+            if (f) Log(JSON.stringify(W ? setting : c, null, 4))
             div("EOF", 1, 1)
         }
     }
@@ -272,7 +295,8 @@ async function init() {
     const configDft = {
         setting:    "{}",
         arround:    "{}",
-        books:      "{}"
+        books:      "{}",
+        pagewarning:   "{}"
     }
     for (let i in configDft)
         if (! await existFile(`${p_data}/${i}.json`))
