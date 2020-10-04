@@ -17,7 +17,7 @@ function Err(m) {
     m = `\x1B[31m${m}\x1B[0m`
     if (debug) throw m
     else console.error(m)
-    div("EOF", 1, 0)
+    div("EOF", 1, 1)
     process.exit()
 }
 function Log(...m) { console.log(...m) }
@@ -225,9 +225,9 @@ const verbs = {
         const key = arround.curr.match(/(.*)\//)[1]
         const books = await readConfig("books")
         
-        let newBook = ! books[key]
+        const newBook = ! books[key], nameOri = books[key].name
         books[key] = arround
-        books[key].name = args[1]
+        books[key].name = args[1] ?? nameOri
         await writeConfig("books", books)
 
         div("bookmark", 0, 1)
@@ -241,7 +241,7 @@ const verbs = {
 
         div("bookfetch", 0, 2)
         const books = await readConfig("books")
-        for (let i in books) if (name === i || name === books[i].name) {
+        for (let i in books) if (name === i || books[i].name?.startWith(name)) {
             Log("Succeeded.")
             await verbs.fetch(books[i].curr)
             return
