@@ -1,0 +1,29 @@
+{
+  "name": "terminal-xbqg",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "dependencies": {
+    "fkutil": "^2.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.10.0"
+  },
+  "scripts": {
+    "test": "xbqg"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ForkFG/TerminalXbqg.git"
+  },
+  "keywords": [
+    "terminal",
+    "novel"
+  ],
+  "author": "ForkKILLET",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ForkFG/TerminalXbqg/issues"
+  },
+  "homepage": "https://github.com/ForkFG/TerminalXbqg#readme"
+}
