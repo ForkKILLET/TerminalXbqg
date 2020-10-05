@@ -57,6 +57,18 @@ function writeJSON(path, data) {
     })
 }
 
+function div(t, u, d) {
+    process.stdout.write(
+        "\n".repeat(u ?? 1) +
+        "-".repeat(10) +
+        "=".repeat(5) +
+        (t ? ` \x1B[1;34m${t}\x1B[0m ` : "") +
+        "=".repeat(5) +
+        "-".repeat(10) +
+        "\n".repeat(d ?? 1)
+    )
+}
+
 // :: Script
 
 const [ , , ...args ] = process.argv
@@ -66,22 +78,14 @@ if (verb.match(/\d+_\d+\/\d+/)) {
     verb = "fetch"
 }
 
-function div(t, u, d) {
-    process.stdout.write(
-        "\n".repeat(u ?? 1) +
-        "-".repeat(10) +
-        "=".repeat(5) + 
-        (t ? ` \x1B[1;34m${t}\x1B[0m ` : "") +
-        "=".repeat(5) +
-        "-".repeat(10) +
-        "\n".repeat(d ?? 1)
-    )
+const p_data = process.env.XBQG_DATA.replace(/\/$/, "")
+if (!p_data) {
+    div("init", 0, 2)
+    Err("xbqg: Please configure the environment variable `XBQG_DATA` to a non-root dir.")
 }
 
-const p_data = process.env.XBQG_DATA.replace(/\/$/, "")
-if (!p_data) Err("xbqg: Please configure the environment variable `XBQG_DATA` to a non-root dir.")
-
-let arround, setting
+let arround, setting, pagewarner, books
+const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
 
 async function readConfig(filename, noParse) {
     const o = await readJSON(`${p_data}/${filename}.json`, noParse)
@@ -91,7 +95,7 @@ async function readConfig(filename, noParse) {
 async function writeConfig(filename, data) {
     const o = await writeJSON(`${p_data}/${filename}.json`, data)
     if (o instanceof Error) Err(o)
-    return o 
+    return o
 }
 
 function fetchAlias(name) {
@@ -99,8 +103,13 @@ function fetchAlias(name) {
         div("page info", 0, 2)
         arround = await readConfig("arround")
         if (arround[name]) {
+            pagewarner = await readConfig("pagewarner")
+            if (Is.udf(pagewarner[today])) pagewarner[today] = 0
+            else pagewarner[today] += { prev: -1, curr: 0, next: +1 }[name]
+            await writeConfig("pagewarner", pagewarner)
+
             Log(`${name}: ${arround[name]}`)
-            verbs.fetch(arround[name])
+            await verbs.fetch(arround[name])
         }
         else {
             Log(`${name}: null`)
@@ -119,7 +128,7 @@ const verbs = {
     "]":    "fetch_next",       "fn":   "fetch_next",
     "-":    "arround",          "a":    "arround",
 
-    "@-":   "book_list",        "bs":   "book_show",
+    "@-":   "book_show",        "bs":   "book_show",
     "@+":   "book_mark",        "bm":   "book_mark",
     "@:":   "book_fetch",       "bf":   "book_fetch",
 
@@ -129,7 +138,7 @@ const verbs = {
 
     "^-":   "pagewarner_stat",  "ps":   "pagewarner_stat",
     "^=":   "pagewarner_diff",  "pd":   "pagewarner_diff",
-    
+
     "?":    "help",             "h":    "help",
 
     // :::: work
@@ -153,7 +162,7 @@ const verbs = {
         div("text", 1, 2)
         Log(_title, "\n", _content)
 
-        div("arround", 1, 2)
+        div("arround", 1, 1)
         const
             _arround = _html.match(/=keypage;([\s\S]*)function keypage/)[1],
             _prev = _arround.match(/prevpage="\/(.*).html"/)?.[1],
@@ -163,29 +172,14 @@ const verbs = {
                 curr: page,
                 next: _next ?? null
             }
-        Log(JSON.stringify(arround, null, 4) + "\n")
-        
+        Log(JSON.stringify(arround, null, 4))
+
         arround.title = _title
         await writeConfig("arround", arround)
 
-        const pagewarner = await readConfig("pagewarner")
-        const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
-        // WwW: I don't think anyone can read these pages one day.
-        const n = setting.pagewarner.warnNum ?? 0xffff
+        verbs.pagewarner_stat(setting.pagewarner.onlyWarnAfterFetching, true)
 
-        if (pagewarner.date !== today) {
-            pagewarner.date = today
-            pagewarner.num = 0
-        }
-        else pagewarner.num++
-        if (pagewarner.num >= n) {
-            div("pagewarner", 0, 2)
-            Warn(`You have reached the warning page number ${n}.\nPage now: ${pagewarner.num}.\nSuggestion: stop.\n`)
-        }
-
-        await writeConfig("pagewarner", pagewarner)
-
-        div("EOF", 0, 1)
+        div("EOF", 1, 1)
     },
 
     help: () => {
@@ -208,20 +202,21 @@ const verbs = {
         div("bookcase", 0, 2)
         // TODO: better display
         Log(await readConfig("books", true))
-        div("EOF", 1, 1) 
+        div("EOF", 1, 1)
     },
 
     book_mark: async() => {
-        const arround = await readConfig("arround")
-        const key = arround.curr.match(/(.*)\//)[1]
-        const books = await readConfig("books")
-        
-        const newBook = ! books[key], nameOri = books[key].name
+        arround = await readConfig("arround")
+        books = await readConfig("books")
+        const
+            key = arround.curr.match(/(.*)\//)[1],
+            newBook = ! books[key],
+            nameOri = books[key].name
         books[key] = arround
         books[key].name = args[1] ?? nameOri
-        await writeConfig("books", books)
 
         div("bookmark", 0, 1)
+        await writeConfig("books", books)
         Log(newBook ? "Added." : "Updated.")
         div("EOF", 0, 1)
     },
@@ -229,9 +224,9 @@ const verbs = {
     book_fetch: async() => {
         const name = args[1]
         if (!name) Err("bookfetch: book name can't be null.")
+        books = await readConfig("books")
 
         div("bookfetch", 0, 2)
-        const books = await readConfig("books")
         for (let i in books) if (name === i || books[i].name?.startWith(name)) {
             Log("Succeeded.")
             await verbs.fetch(books[i].curr)
@@ -294,11 +289,11 @@ const verbs = {
 
         div("config edit", 0, 2)
         Log("Running " + Hili("$ " + editor))
-        
+
         await execa.command(editor, {
             stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
         })
-        
+
         Log(`Done.`)
         div("EOF", 1, 1)
     },
@@ -312,6 +307,32 @@ const verbs = {
         await writeConfig("setting", configDft.setting)
         Log("Done.")
         div("EOF", 1, 1)
+    },
+
+    pagewarner_stat: async(onlyWarn, afterFetching) => {
+        pagewarner = pagewarner ?? await readConfig("pagewarner")
+
+        const n = pagewarner[today] ?? 0, m = setting.pagewarner.warnNum
+        
+        div("pagewarner stat", 0, 2)
+        if (n <= m) {
+            if (onlyWarn) return
+
+            Log(`Reading progress today: [${n} / ${m}]`)
+            Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
+            const l = setting.pagewarner.progressLength, nc = parseInt(n / m * l)
+            Log("[ " + Hili("#".repeat(nc)) + "=".repeat(l - nc) + " ]")
+        }
+        else {
+            Warn(`Reading progress today: [${n} / ${m}]`)
+            Warn(`${n - m} pages more than the warning num!`)
+            Warn("Suggestion: stop now!")
+        }
+        if (!afterFetching) div("EOF", 1, 1)
+    },
+
+    pagewarner_diff: async() => {
+        
     }
 }
 
@@ -319,7 +340,9 @@ const configDft = {
     setting:        {
         editor: "vi ${path}",
         pagewarner: {
-            warnNum: 0xffff
+            warnNum: 42,
+            progressLength: 80,
+            onlyWarnAfterFetching: true
         },
         sourceActive: "xbqg",
         sources: {
@@ -346,6 +369,7 @@ async function init() {
                 await verbs[verb]()
                 done = true; break
             default:
+                div("init", 0, 2)
                 Err(`xbqg: Unknown verb: ${verb}`)
         }
     }
