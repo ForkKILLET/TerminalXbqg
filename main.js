@@ -333,6 +333,19 @@ const verbs = {
 
     pagewarner_diff: async() => {
         pagewarner = pagewarner ?? await readConfig("pagewarner")
+
+        div("pagewarner diff", 0, 2)
+
+        const l = setting.pagewarner.progressLength
+        let m = l
+        for (let day in pagewarner) if (pagewarner[day] > m) m = pagewarner[day]
+
+        for (let day in pagewarner) {
+            const n = pagewarner[day]
+            Log(day + " | " + Hili("#".repeat(n / m * l)) + " ]" + n)
+        }
+
+        div("EOF", 1, 1)
     }
 }
 
