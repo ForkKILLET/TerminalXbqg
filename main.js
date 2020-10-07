@@ -145,7 +145,7 @@ const verbs = {
 
     fetch: async(page) => {
         page = page ?? args[1]
-        if (!page) Err("fetch: Page can't be null.")
+        if (! page) Err("fetch: Page can't be null.")
 
         const srcName = setting.sourceActive, src = setting.sources[srcName]
         const _html = await ajax(src.url.replace(/\$\{page\}/g, page))
@@ -177,7 +177,7 @@ const verbs = {
         arround.title = _title
         await writeConfig("arround", arround)
 
-        verbs.pagewarner_stat(setting.pagewarner.onlyWarnAfterFetching, true)
+        await verbs.pagewarner_stat(setting.pagewarner.onlyWarnAfterFetching, true)
 
         div("EOF", 1, 1)
     },
@@ -223,7 +223,7 @@ const verbs = {
 
     book_fetch: async() => {
         const name = args[1]
-        if (!name) Err("bookfetch: book name can't be null.")
+        if (! name) Err("bookfetch: book name can't be null.")
         books = await readConfig("books")
 
         div("bookfetch", 0, 2)
@@ -313,7 +313,7 @@ const verbs = {
         pagewarner = pagewarner ?? await readConfig("pagewarner")
 
         const n = pagewarner[today] ?? 0, m = setting.pagewarner.warnNum
-        
+
         div("pagewarner stat", 0, 2)
         if (n <= m) {
             if (onlyWarn) return
@@ -321,18 +321,18 @@ const verbs = {
             Log(`Reading progress today: [${n} / ${m}]`)
             Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
             const l = setting.pagewarner.progressLength, nc = parseInt(n / m * l)
-            Log("[ " + Hili("#".repeat(nc)) + "=".repeat(l - nc) + " ]")
+            Log("[ " + Hili("#".repeat(nc)) + "=".repeat(l - nc) + " ] " + (n / m).toPercent())
         }
         else {
             Warn(`Reading progress today: [${n} / ${m}]`)
-            Warn(`${n - m} pages more than the warning num!`)
+            Warn(`${n - m} page${m - n <= 1 ? "" : "s"} more than the warning num!`)
             Warn("Suggestion: stop now!")
         }
         if (!afterFetching) div("EOF", 1, 1)
     },
 
     pagewarner_diff: async() => {
-        
+        pagewarner = pagewarner ?? await readConfig("pagewarner")
     }
 }
 
