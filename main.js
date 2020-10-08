@@ -5,7 +5,7 @@
 const fs    = require("fs")
 const execa = require("execa")
 const {
-    Is, sleep, ajax
+    Is, Cc, sleep, ajax, exTemplate: exT
 }           = require("fkutil") // TODO: refactor with it
 
 // :: Tool
@@ -19,18 +19,29 @@ function Err(...m) {
     m = `\x1B[31m${m.join(" ")}\x1B[0m`
     if (debug) throw m
     console.error(m)
-    div("EOF", 1, 1)
+    Div("EOF", 1, 1)
     process.exit()
 }
 function Log(...m) { console.log(...m) }
+const exTLog = exT.reflect(Log)
 function Hili(m) { return `\x1B[32m${m}\x1B[0m` }
+function Div(t, u, d) {
+    process.stdout.write(
+        "\n".repeat(u ?? 1) +
+        "-".repeat(10) +
+        "=".repeat(5) +
+        (t ? ` \x1B[1;34m${t}\x1B[0m ` : "") +
+        "=".repeat(5) +
+        "-".repeat(10) +
+        "\n".repeat(d ?? 1)
+    )
+}
 
 function existFile(path) {
     return new Promise(resolve =>
         fs.exists(path, exist => resolve(exist))
     )
 }
-
 function readJSON(path, noParse) {
     return new Promise((resolve, reject) => {
         fs.readFile(path, "utf8", (err, data) => {
@@ -42,7 +53,6 @@ function readJSON(path, noParse) {
         })
     })
 }
-
 function writeJSON(path, data) {
     return new Promise((resolve, reject) => {
         fs.writeFile(path, new Uint8Array(
@@ -57,17 +67,6 @@ function writeJSON(path, data) {
     })
 }
 
-function div(t, u, d) {
-    process.stdout.write(
-        "\n".repeat(u ?? 1) +
-        "-".repeat(10) +
-        "=".repeat(5) +
-        (t ? ` \x1B[1;34m${t}\x1B[0m ` : "") +
-        "=".repeat(5) +
-        "-".repeat(10) +
-        "\n".repeat(d ?? 1)
-    )
-}
 
 // :: Script
 
@@ -80,7 +79,7 @@ if (verb.match(/\d+_\d+\/\d+/)) {
 
 const p_data = process.env.XBQG_DATA.replace(/\/$/, "")
 if (!p_data) {
-    div("init", 0, 2)
+    Div("init", 0, 2)
     Err("xbqg: Please configure the environment variable `XBQG_DATA` to a non-root dir.")
 }
 
@@ -100,7 +99,7 @@ async function writeConfig(filename, data) {
 
 function fetchAlias(name) {
     return async() => {
-        div("page info", 0, 2)
+        Div("page info", 0, 2)
         arround = await readConfig("arround")
         if (arround[name]) {
             pagewarner = await readConfig("pagewarner")
@@ -113,7 +112,7 @@ function fetchAlias(name) {
         }
         else {
             Log(`${name}: null`)
-            div("EOF", 1, 1)
+            Div("EOF", 1, 1)
         }
     }
 }
@@ -148,7 +147,7 @@ const verbs = {
         if (! page) Err("fetch: Page can't be null.")
 
         const srcName = setting.sourceActive, src = setting.sources[srcName]
-        const _html = await ajax(src.url.replace(/\$\{page\}/g, page))
+        const _html = await ajax(exT(src.url, { page }))
 
         let _title = _html.match(/<title>(.*)<\/title>/)[1]
         if (_title.match(/^[3-5][01]\d+/))
@@ -159,10 +158,10 @@ const verbs = {
             .replace(/readx\(\);/g, "")
             .replace(/&amp;/g, "&")
             .replace(/&nbsp;/g, " ")
-        div("text", 1, 2)
+        Div("text", 1, 2)
         Log(_title, "\n", _content)
 
-        div("arround", 1, 1)
+        Div("arround", 1, 1)
         const
             _arround = _html.match(/=keypage;([\s\S]*)function keypage/)[1],
             _prev = _arround.match(/prevpage="\/(.*).html"/)?.[1],
@@ -179,13 +178,13 @@ const verbs = {
 
         await verbs.pagewarner_stat(setting.pagewarner.onlyWarnAfterFetching, true)
 
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     },
 
     help: () => {
-        div("help", 0, 2)
+        Div("help", 0, 2)
         Warn("Nothing here, at least not now.")
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     },
 
     fetch_prev: fetchAlias("prev"),
@@ -193,16 +192,16 @@ const verbs = {
     fetch_next: fetchAlias("next"),
 
     arround: async() => {
-        div("arround", 0, 2)
+        Div("arround", 0, 2)
         Log(await readConfig("arround", true) + "\n")
-        div("EOF", 0, 1)
+        Div("EOF", 0, 1)
     },
 
     book_show: async() => {
-        div("bookcase", 0, 2)
+        Div("bookcase", 0, 2)
         // TODO: better display
         Log(await readConfig("books", true))
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     },
 
     book_mark: async() => {
@@ -215,10 +214,10 @@ const verbs = {
         books[key] = arround
         books[key].name = args[1] ?? nameOri
 
-        div("bookmark", 0, 1)
+        Div("bookmark", 0, 1)
         await writeConfig("books", books)
         Log(newBook ? "Added." : "Updated.")
-        div("EOF", 0, 1)
+        Div("EOF", 0, 1)
     },
 
     book_fetch: async() => {
@@ -226,25 +225,25 @@ const verbs = {
         if (! name) Err("bookfetch: book name can't be null.")
         books = await readConfig("books")
 
-        div("bookfetch", 0, 2)
+        Div("bookfetch", 0, 2)
         for (let i in books) if (name === i || books[i].name?.startWith(name)) {
             Log("Succeeded.")
             await verbs.fetch(books[i].curr)
             return
         }
         Warn("Not found.")
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     },
 
     config: async() => {
         if (args[1] == null) {
-            div("config list global", 0, 2)
+            Div("config list global", 0, 2)
             Log(JSON.stringify(setting, null, 4))
-            div("EOF", 1, 1)
+            Div("EOF", 1, 1)
         }
         else {
             const W = !! args[2]
-            div(W ? "config write" : "config read", 0, 2)
+            Div(W ? "config write" : "config read", 0, 2)
 
             let path = args[1]
             if (path[0] !== "." && path[0] !== "[") path = "." + path
@@ -276,18 +275,18 @@ const verbs = {
 
                 modify = pa[key], pa[key] = "${config_modify}"
             }
-            if (f) Log(JSON.stringify(W ? setting : c, null, 4)
-                .replace(/"\$\{config_modify\}"/, Hili(JSON.stringify(modify)))
-            )
-            div("EOF", 1, 1)
+            if (f) Log(exT(JSON.stringify(W ? setting : c, null, 4),
+                { config_modify: Hili(JSON.stringify(modify)) }
+            ))
+            Div("EOF", 1, 1)
         }
     },
 
     config_edit: async() => {
         const path = process.env.XBQG_DATA + "/" + (args[1] ?? "setting") + ".json"
-        const editor = setting.editor.replace(/\$\{path\}/g, path)
+        const editor = exT(setting.editor, { path })
 
-        div("config edit", 0, 2)
+        Div("config edit", 0, 2)
         Log("Running " + Hili("$ " + editor))
 
         await execa.command(editor, {
@@ -295,18 +294,18 @@ const verbs = {
         })
 
         Log(`Done.`)
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     },
 
     config_reset: async() => {
-        div("config reset", 0, 2)
+        Div("config reset", 0, 2)
         Warn("The default setting will be restored in 5 sec.")
         await sleep(5000)
 
         Log("Reseting.")
         await writeConfig("setting", configDft.setting)
         Log("Done.")
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     },
 
     pagewarner_stat: async(onlyWarn, afterFetching) => {
@@ -314,38 +313,49 @@ const verbs = {
 
         const n = pagewarner[today] ?? 0, m = setting.pagewarner.warnNum
 
-        div("pagewarner stat", 0, 2)
+        Div("pagewarner stat", 0, 2)
         if (n <= m) {
             if (onlyWarn) return
 
             Log(`Reading progress today: [${n} / ${m}]`)
             Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
-            const l = setting.pagewarner.progressLength, nc = parseInt(n / m * l)
-            Log("[ " + Hili("#".repeat(nc)) + "=".repeat(l - nc) + " ] " + (n / m).toPercent())
+            const l = setting.pagewarner.progressStyle.stat.length, nc = parseInt(n / m * l)
+            exTLog(setting.pagewarner.progressStyle.stat.fommat, "setting.pagewarner.progressStyle.stat.fommaat", {
+                progress: (_, f, b) =>
+                    Hili(Cc(f, _.param(0, "fore")).char().r.repeat(nc)) +
+                    Cc(b, _.param(1, "back")).char().r.repeat(l - nc),
+                percent: (n / m).toPercent()
+            })
         }
         else {
             Warn(`Reading progress today: [${n} / ${m}]`)
             Warn(`${n - m} page${m - n <= 1 ? "" : "s"} more than the warning num!`)
             Warn("Suggestion: stop now!")
         }
-        if (!afterFetching) div("EOF", 1, 1)
+        if (!afterFetching) Div("EOF", 1, 1)
     },
 
     pagewarner_diff: async() => {
         pagewarner = pagewarner ?? await readConfig("pagewarner")
 
-        div("pagewarner diff", 0, 2)
+        Div("pagewarner diff", 0, 2)
 
-        const l = setting.pagewarner.progressLength
-        let m = l
-        for (let day in pagewarner) if (pagewarner[day] > m) m = pagewarner[day]
+        // TODO
+
+        const l = setting.pagewarner.progressStyle.diff.length
+        let m = l; for (let day in pagewarner) if (pagewarner[day] > m) m = pagewarner[day]
 
         for (let day in pagewarner) {
             const n = pagewarner[day]
-            Log(day + " | " + Hili("#".repeat(n / m * l)) + " ]" + n)
+            exTLog(setting.pagewarner.progressStyle.diff.fommat, "setting.pagewarner.progressStyle.diff.fommat", {
+                date: day,
+                progress: (_, f) =>
+                    Hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * l)),
+                number: n
+            })
         }
 
-        div("EOF", 1, 1)
+        Div("EOF", 1, 1)
     }
 }
 
@@ -354,8 +364,17 @@ const configDft = {
         editor: "vi ${path}",
         pagewarner: {
             warnNum: 42,
-            progressLength: 80,
-            onlyWarnAfterFetching: true
+            onlyWarnAfterFetching: true,
+            progressStyle: {
+                stat: {
+                    length: 80,
+                    fommat: "[ !{ progress | # | = } ] ${percent}"
+                },
+                diff: {
+                    length: 80,
+                    fommat: "${date} | !{ progress | # } ] ${number}"
+                }
+            }
         },
         sourceActive: "xbqg",
         sources: {
@@ -382,7 +401,7 @@ async function init() {
                 await verbs[verb]()
                 done = true; break
             default:
-                div("init", 0, 2)
+                Div("init", 0, 2)
                 Err(`xbqg: Unknown verb: ${verb}`)
         }
     }
