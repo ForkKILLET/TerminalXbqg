@@ -9,6 +9,7 @@
         "ecmaVersion": 12
     },
     "rules": {
-            
+        "max-len": [ 2, { "code": 90 } ],
+        "no-empty": 0
     }
 }
