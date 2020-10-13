@@ -125,7 +125,7 @@ const verbs = {
         const s = source ?? setting.source.active, src = setting.source.list[s]
         const g = setting.source.list.global
         const matcher = Object.assign(g.matcher, src.matcher ?? {})
-        const replacer = g.replacer.concat(src.replacer)
+        const replacer = g.replacer.concat(src.replacer ?? [])
         const blocks = {}
 
         try {
@@ -270,7 +270,7 @@ const verbs = {
             }
             else {
                 Warn("Not found.")
-                Div("EOF", 1, 1)
+                Div("EOF", 0, 1)
             }
         }
     },
