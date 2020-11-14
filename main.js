@@ -7,11 +7,13 @@ const execa = require("execa")
 const {
     Is, Cc, ski,
     sleep, ajax, exTemplate: exT, serialize,
-    Logger: {
-        warn: Warn, errEOF: Err, log: Log,
-        exTemplateLog: exTLog, hili: Hili, div: Div
-    }
+    Logger
 }           = require("fkutil") // TODO: refactor with it
+
+const {
+    warn: Warn, errEOF: Err, log: Log,
+    exTemplateLog: exTLog, hili: Hili, div: Div
+} = Logger({})
 
 // :: Tool
 
@@ -59,8 +61,8 @@ async function writeConfig(filename, data) {
 const [ , , ...args ] = process.argv
 let verb = args?.[0] ?? "help"
 
-const p_data = process.env.XBQG_DATA.replace(/\/$/, "")
-if (!p_data) {
+const p_data = process.env.XBQG_DATA?.replace(/\/$/, "")
+if (! p_data) {
     Div("init", 0, 2)
     Err("Please config the environment variable `XBQG_DATA` to a non-root dir.")
 }
