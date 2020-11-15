@@ -556,6 +556,43 @@ const configDft = {
             [ /\n{3,}/, "\n\n" ]
           ],
           matchKeyInArround: /(.*)_/
+        },
+        "ibiqu": {
+          url: "http://www.ibiqu.net/book/${page}.htm",
+          charset: "gbk",
+          matcher: {
+            bookName: {
+              necessary: true,
+              from: "title",
+              regexp: /_(.*?)小说在线阅读/
+            },
+            chapterName: {
+              necessary: true,
+              from: "title",
+              regexp: /^ (.*?)_/
+            },
+            content: {
+              necessary: true,
+              from: "html",
+              regexp: /<div id="content">([^]*?)<\/div>/
+            },
+            prev: {
+              necessary: false,
+              from: "html",
+              regexp: /<a href="\/book\/([0-9\/]*?).htm">上一章<\/a>/
+            },
+            next: {
+              necessary: false,
+              from: "html",
+              regexp: /<a href="\/book\/([0-9\/]*?).htm">下一章<\/a>/
+            }
+          },
+          replacer: [
+            [ /<p>/, "" ],
+            [ /<\/p>/, "\n" ],
+            [ /一秒记住，精彩小说无弹窗免费阅读！/, "" ]
+          ],
+          matchKeyInArround: /(.*)\//
         }
       }
     }
