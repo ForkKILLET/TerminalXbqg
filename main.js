@@ -1,4 +1,4 @@
-#!/Volumes/FORKUB/Safety/bin/node
+#!/bin/env node
 
 // :: Import
 
@@ -67,15 +67,15 @@ if (! p_data) {
     Err("Please config the environment variable `XBQG_DATA` to a non-root dir.")
 }
 
-let arround, setting, pagewarner, books
+let around, setting, pagewarner, books
 const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
 
 function fetchAlias(name) {
     return async(_, source) => {
         Div("page info", 0, 1)
 
-        arround = await readConfig("arround")
-        const src = setting.source.active, page = arround[src]?.[name]
+        around = await readConfig("around")
+        const src = setting.source.active, page = around[src]?.[name]
 
         if (page) {
             pagewarner = await readConfig("pagewarner")
@@ -84,7 +84,7 @@ function fetchAlias(name) {
             await writeConfig("pagewarner", pagewarner)
 
             Log(`${name}: ${page}`)
-            await verbs.fetch(page, source, name === "curr")
+            await verbs.fetch(page, source)
         }
         else {
             Log(`${name}: null`)
@@ -102,7 +102,7 @@ const verbs = {
     "[":    "fetch_prev",       "fp":   "fetch_prev",
     "=":    "fetch_curr",       "fc":   "fetch_curr",
     "]":    "fetch_next",       "fn":   "fetch_next",
-    "-":    "arround",          "a":    "arround",
+    "-":    "around",          "a":    "around",
 
     "@-":   "book_show",        "bs":   "book_show",
     "@+":   "book_mark",        "bm":   "book_mark",
@@ -166,7 +166,7 @@ const verbs = {
         Log(chapterTitle)
         Log(blocks.content)
 
-        Div("arround", 1, 1)
+        Div("around", 1, 1)
 
         const a = {
             prev: blocks.prev,
@@ -175,11 +175,11 @@ const verbs = {
         }
         Log(JSON.stringify(a, null, 2))
 
-        arround = arround ?? await readConfig("arround")
+        around = around ?? await readConfig("around")
         a.title = chapterTitle
-        arround[s] = a
+        around[s] = a
 
-        if (noArround !== true) await writeConfig("arround", arround)
+        if (! noArround) await writeConfig("around", around)
 
         await verbs.pagewarner_stat(setting.pagewarner.onlyWarnAfterFetching, true)
 
@@ -213,11 +213,11 @@ const verbs = {
     fetch_curr: fetchAlias("curr"),
     fetch_next: fetchAlias("next"),
 
-    arround: async(source) => {
-        Div("arround", 0, 2)
+    around: async(source) => {
+        Div("around", 0, 2)
 
-        arround = await readConfig("arround")
-        Log(serialize(arround[source ?? setting.source.active], { indent: 2 }))
+        around = await readConfig("around")
+        Log(serialize(around[source ?? setting.source.active], { indent: 2 }))
 
         Div("EOF", 1, 1)
     },
@@ -232,14 +232,14 @@ const verbs = {
     book_mark: async(name) => {
         Div("book mark", 0, 2)
 
-        arround = await readConfig("arround")
+        around = await readConfig("around")
         books = await readConfig("books")
 
         const src = setting.source.active
         const re = RegExp(setting.source.list[src].matchKeyInArround)
-        const key = arround[src]?.curr.match(re)[1]
+        const key = around[src]?.curr.match(re)[1]
 
-        if (! key) Err("No arround is found.")
+        if (! key) Err("No around is found.")
 
         let newBook = true
         for (let i in books)
@@ -251,7 +251,7 @@ const verbs = {
         if (newBook && ! name)
             Err("Book name can't be null when adding new book.")
         if (! books[name]) books[name] = {}
-        books[name][src] = arround[src]
+        books[name][src] = around[src]
 
         await writeConfig("books", books)
         Log(newBook ? "Added." : "Updated.")
@@ -472,19 +472,19 @@ const configDft = {
               from: "html",
               regexp: /<div id="content">([^]*?)<\/div>/
             },
-            arround: {
+            around: {
               necessary: true,
               from: "html",
               regexp: /=keypage;([^]*?)function keypage/
             },
             prev: {
               necessary: false,
-              from: "arround",
+              from: "around",
               regexp: /prevpage="\/(.*?).html"/
             },
             next: {
               necessary: false,
-              from: "arround",
+              from: "around",
               regexp: /nextpage="\/(.*?).html"/
             }
           },
@@ -597,7 +597,7 @@ const configDft = {
       }
     }
   },
-  arround: {},
+  around: {},
   books: {},
   pagewarner: {}
 }
