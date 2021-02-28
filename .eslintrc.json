@@ -9,7 +9,11 @@
         "ecmaVersion": 12
     },
     "rules": {
-        "max-len": [ 2, { "code": 90 } ],
-        "no-empty": 0
+        "max-len": [ 2, { "code": 125 } ],
+        "no-empty": 0,
+		"no-mixed-spaces-and-tabs": 0,
+		"no-useless-escape": 0,
+		"no-debugger": 0,
+		"no-control-regex": 0
     }
 }
