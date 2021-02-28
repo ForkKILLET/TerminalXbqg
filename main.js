@@ -364,7 +364,8 @@ const fun = {
 			Log(`Reading progress today: [${n} / ${m}]`)
 			Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
 			const l = setting.pagewarner.progressStyle.stat.length
-			const nc = parseInt(n / m * l)
+			let nc = parseInt(n / m * l)
+			if (nc < 0) nc = 0
 			exTLog(
 				setting.pagewarner.progressStyle.stat.fommat,
 				"setting.pagewarner.progressStyle.stat.fommat", {
