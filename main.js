@@ -4,6 +4,7 @@
 
 const fs			= require("fs")
 const execa			= require("execa")
+const readline		= require("readline")
 const { program }	= require("commander")
 const {
 	Is, Cc, ski,
@@ -58,7 +59,7 @@ async function writeConfig(filename, data) {
 // :: Logic
 
 let around, setting, pagewarner, books,
-	options, p_data
+	options, p_data, interactive = false, help = 1
 const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
 
 function fetchAlias(name) {
@@ -111,7 +112,7 @@ const info = {
 												 "The task is immediately done when `now` is given." ] ],
 	"pagewarner_stat":	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` inforamtio  using a progress bar." ] ],
 	"pagewarner_diff":	[ [ "^=",	"pd"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
-	"interactive":		[ [ "!",	"i"		], [ "WIP" ] ],
+	"interactive":		[ [ "!",	"i"		], [ "Enter the `interactive` mode." ] ],
 	"help":				[ [ "?",	"h"		], [ "Show help of the given `theme` or `command name`.",
 												 "Show usage when no arguments is given."] ],
 }
@@ -337,10 +338,10 @@ const fun = {
 		Div("EOF", 1, 1)
 	},
 
-	config_reset: async(now) => {
+	config_reset: async(_now) => {
 		Div("config reset", 0, 2)
 
-		if (now !== "now") {
+		if (_now !== "now") {
 			Warn("The default setting will be restored in 5 sec.")
 			await sleep(5000)
 		}
@@ -406,14 +407,49 @@ const fun = {
 		Div("EOF", 1, 1)
 	},
 
+	interactive: async() => {
+		Div("interactive", 0, 2)
+		
+		if (interactive) {
+			Warn("Already in interactive mode.")
+			Div("EOF", 1, 1)
+			return
+		}
+
+		interactive = true
+
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout,
+			prompt: setting.interactive.prompt
+		})
+		rl.prompt()
+		rl.on("line", async(cmd) => {
+			if (! cmd.trim()) {
+				rl.prompt()
+				return
+			}
+			help = 1
+			await program.parseAsync(cmd.split(" "), { from: "user" })
+			
+			rl.prompt()
+		})
+		rl.on("close", () => {
+			Div("EOF", 2, 1)
+		})
+	},
+
 	help: async(_theme) => {
+		if (! help) return
+		help --
+
 		Div("help", 0, 2)
 
 		let noPadding = false
 
 		const
 			len = s => s.replace(/\x1B\[.+?m/g, "").length,
-			pad = x => noPadding === true ? " " :  " ".repeat(x),
+			pad = x =>  " ".repeat(noPadding === true ? 1 : x),
 			
 			opt = o => {
 				const alias = o.flags.split(", ").map(f => f.replace(/[^-]/g, s => Hili(s))).join(" | ")
@@ -431,28 +467,39 @@ const fun = {
 						(c._aliases.map(a => " | " + Hili(a)).join(""))
 				return "\n" +
 					alias + pad(30 - len(alias)) +
-					argument + pad(25 - len(argument)) +
-					c.description().replace(/\n/g, "\n" + pad(55))
+					argument + pad(25 - len(argument)) + (
+					noPadding
+						? "\n" + c.description()
+						: c.description().replace(/\n/g, "\n" + pad(55))
+					)
 			}
 
 		if (! _theme || Is.obj(_theme) && _theme.error === true) // Hack: Kill original help.
 			Log(
-				Hili("OPTIONS\n") + program.options.map(opt).join("") + "\n\n" +
-				Hili("COMMANDS\n") + program.commands.map(cmd).join("")
+				"OPTIONS\n" + program.options.map(opt).join("") + "\n\n" +
+				"COMMANDS\n" + program.commands.map(cmd).join("")
 			)
 		else {
-			const id = Object.keys(info).indexOf(_theme)
+			let id
+			Object.entries(info).forEach((v, k) => {
+				const i = [ v[0], ...v[1][0] ].indexOf(_theme)
+				if (i >= 0) id = k
+			})
 			noPadding = true
-			if (id >= 0) Log(cmd(program.commands[id]))
+			if (! Is.undef(id)) Log("COMMAND\n" + cmd(program.commands[id]))
 		}
 		Div("EOF", 1, 1)
-		process.exit(0)
+		
+		if (! interactive) process.exit(0)
 	}
 }
 
 const configDft = {
 	setting: {
 	  editor: "vi ${path}",
+	  interactive: {
+	    prompt: "xbqg$ "
+	  },
 	  pagewarner: {
 	    warnNum: 50,
 	    onlyWarnAfterFetching: false,
@@ -670,7 +717,7 @@ async function init() {
 						writeConfig(i, configDft[i])
 				setting = await readConfig("setting")
 
-				f(...P)
+				await f(...P)
 			})
 	}
 
