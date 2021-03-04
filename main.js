@@ -19,71 +19,43 @@ const logger = Logger().bind(), {
 
 // :: Tool
 
-function existFile(path) {
-	return new Promise(resolve =>
-		fs.exists(path, exist => resolve(exist))
+const existFile = p => new Promise(resolve =>
+	fs.exists(p, exist => resolve(exist))
+)
+const readJSON = (p, noParse) => new Promise((resolve, reject) =>
+	fs.readFile(p, "utf8", (err, data) => err
+		? reject(err)
+		: resolve(noParse
+			? data.toString()
+			: JSON.parse(data.toString())
+		)
 	)
-}
-function readJSON(path, noParse) {
-	return new Promise((resolve, reject) => {
-		fs.readFile(path, "utf8", (err, data) => {
-			if (err) reject(err)
-			else resolve(noParse
-				? data.toString()
-				: JSON.parse(data.toString())
-			)
-		})
-	})
-}
-function writeJSON(path, data) {
-	return new Promise((resolve, reject) => {
-		fs.writeFile(path, new Uint8Array(
-			Buffer.from(Is.str(data)
-				? data
-				: serialize(data, { regexp: true, indent: 2 })
-			)
-		), "utf8", err => {
-			if (err) reject(err)
-			else resolve()
-		})
-	})
-}
-
-async function readConfig(filename, noParse) {
-	return await readJSON(`${p_data}/${filename}.json`, noParse)
-}
-async function writeConfig(filename, data) {
-	return await writeJSON(`${p_data}/${filename}.json`, data)
-}
+)
+const writeJSON = (p, data) => new Promise((resolve, reject) =>
+	fs.writeFile(p, new Uint8Array(
+		Buffer.from(Is.str(data)
+			? data
+			: serialize(data, { regexp: true, indent: 2 })
+		)
+	), "utf8", err => err
+		? reject(err)
+		: resolve()
+	)
+)
 
 // :: Logic
 
-let around, setting, pagewarner, books,
-	options, p_data, interactive = false, help = 1
-const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
-
-function fetchAlias(name) {
-	return async() => {
-		Div("page info", 0, 1)
-
-		around = await readConfig("around")
-		const src = setting.source.active, page = around[src]?.[name]
-
-		if (page) {
-			pagewarner = await readConfig("pagewarner")
-			if (Is.udf(pagewarner[today])) pagewarner[today] = 0
-			else pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
-			await writeConfig("pagewarner", pagewarner)
-
-			Log(`${name}: ${page}`)
-			await fun.fetch(page)
-		}
-		else {
-			Log(`${name}: null`)
-			Div("EOF", 0, 1)
-		}
-	}
+const c = {
+	read: async(fn, noParse) => await readJSON(`${p_data}/${fn}.json`, noParse),
+	write: async(fn, data) => await writeJSON(`${p_data}/${fn}.json`, data)
 }
+const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
+const flag = {
+	pre: false,
+	interactive: false,
+	help: false,
+}
+let options, p_data, rln = null
 
 const info = {
 	"fetch":			[ [ ":",	"f"		], [ "Fetch a page by specific `page` id." ] ],
@@ -117,13 +89,34 @@ const info = {
 												 "Show usage when no arguments is given."] ],
 }
 
+const fetch_alias = name => async() => {
+	Div("page info", 0, 1)
+
+	c.around = await c.read("around")
+	const src = c.setting.source.active, page = c.around[src]?.[name]
+
+	if (page) {
+		c.pagewarner = await c.read("pagewarner")
+		if (Is.udf(c.pagewarner[today])) c.pagewarner[today] = 0
+		else c.pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
+		await c.write("pagewarner", c.pagewarner)
+
+		Log(`${name}: ${page}`)
+		await fun.fetch(page)
+	}
+	else {
+		Log(`${name}: null`)
+		Div("EOF", 0, 1)
+	}
+}
+
 const fun = {
 	fetch: async(page) => {
 		Div("fetch", 0, 2)
 		if (! page) Err("Page can't be null.")
 
-		const s = setting.source.active, src = setting.source.list[s]
-		const g = setting.source.list.global
+		const s = c.setting.source.active, src = c.setting.source.list[s]
+		const g = c.setting.source.list.global
 		const matcher = Object.assign(g.matcher, src.matcher ?? {})
 		const replacer = g.replacer.concat(src.replacer ?? [])
 		const blocks = {}
@@ -174,79 +167,80 @@ const fun = {
 		}
 		Log(JSON.stringify(a, null, 2))
 
-		around = around ?? await readConfig("around")
+		c.around = c.around ?? await c.read("around")
 		a.title = chapterTitle
-		around[s] = a
+		a.time = + new Date()
+		c.around[s] = a
 
-		await writeConfig("around", around)
+		await c.write("around", c.around)
 
 		await fun.pagewarner_stat(true)
 
 		Div("EOF", 1, 1)
 	},
 
+	fetch_prev: fetch_alias("prev"),
+	fetch_curr: fetch_alias("curr"),
+	fetch_next: fetch_alias("next"),
+
+	around: async() => {
+		Div("around", 0, 2)
+
+		c.around = await c.read("around")
+		Log(serialize(c.around[c.setting.source.active], { indent: 2 }))
+
+		Div("EOF", 1, 1)
+	},
+	
 	source: async(_src) => {
 		if (_src) {
 			Div("source switch", 0, 1)
 
-			setting.source.active = _src
-			await writeConfig("setting", setting)
+			c.setting.source.active = _src
+			await c.write("setting", c.setting)
 			Log("Succeed.")
 
 			Div("EOF", 0, 1)
 		}
 		else {
 			Div("source active", 0, 1)
-			Log(setting.source.active)
+			Log(c.setting.source.active)
 			Div("EOF", 0, 1)
 		}
-	},
-
-	fetch_prev: fetchAlias("prev"),
-	fetch_curr: fetchAlias("curr"),
-	fetch_next: fetchAlias("next"),
-
-	around: async() => {
-		Div("around", 0, 2)
-
-		around = await readConfig("around")
-		Log(serialize(around[setting.source.active], { indent: 2 }))
-
-		Div("EOF", 1, 1)
 	},
 
 	book_show: async() => {
 		Div("book show", 0, 2)
 		// TODO: better display
-		Log(await readConfig("books", true))
+		Log(await c.read("books", true))
 		Div("EOF", 1, 1)
 	},
 
 	book_mark: async(_name) => {
 		Div("book mark", 0, 2)
 
-		around = await readConfig("around")
-		books = await readConfig("books")
+		c.around = await c.read("around")
+		c.books = await c.read("books")
 
-		const src = setting.source.active
-		const re = RegExp(setting.source.list[src].matchKeyInArround)
-		const key = around[src]?.curr.match(re)[1]
+		const src = c.setting.source.active
+		const re = RegExp(c.setting.source.list[src].matchKeyInArround)
+		const key = c.around[src]?.curr.match(re)[1]
 
 		if (! key) Err("No around is found.")
 
 		let newBook = true
-		for (let i in books)
-			if (books[i][src]?.curr.match(re)[1] === key) {
+		for (let i in c.books)
+			if (c.books[i][src]?.curr.match(re)[1] === key) {
 				newBook = false
 				_name = i
 			}
 
 		if (newBook && ! _name)
 			Err("Book name can't be null when adding new book.")
-		if (! books[_name]) books[_name] = {}
-		books[_name][src] = around[src]
+		if (! c.books[_name]) c.books[_name] = {}
+		c.books[_name][src] = c.around[src]
 
-		await writeConfig("books", books)
+		await c.write("books", c.books)
 		Log(newBook ? "Added." : "Updated.")
 		Div("EOF", 1, 1)
 	},
@@ -255,10 +249,10 @@ const fun = {
 		Div("book fetch", 0, 1)
 
 		if (! name) Err("Book name can't be null.")
-		books = await readConfig("books")
+		c.books = await c.read("books")
 
-		for (let i in books) if (i.startWith(name)) {
-			const src = setting.source.active, a = books[i][src]
+		for (let i in c.books) if (i.startWith(name)) {
+			const src = c.setting.source.active, a = c.books[i][src]
 			if (a) {
 				Log("Succeeded.")
 				await fun.fetch(a.curr)
@@ -273,7 +267,7 @@ const fun = {
 	config: async(_path, _action, _val) => {
 		if (! _path) {
 			Div("config list global", 0, 2)
-			Log(serialize(setting, { indent: 2 }))
+			Log(serialize(c.setting, { indent: 2 }))
 			Div("EOF", 1, 1)
 		}
 		else {
@@ -283,7 +277,7 @@ const fun = {
 			if (_path[0] !== "." && _path[0] !== "[") _path = "." + _path
 
 			const rsit = _path.matchAll(/\.([_a-zA-Z][0-9_a-zA-Z]*)|\[(\d+)]/g)
-			let rs, o = setting, pa_o, k, pa_k, t
+			let rs, o = c.setting, pa_o, k, pa_k, t
 			// Note:
 			// a.b.c
 			// o					pa_o				k		pa_k
@@ -313,7 +307,7 @@ const fun = {
 				pa_o[k] = [ "undefined", "-" ].includes(_action)
 					? undefined
 					: JSON.parse(_action === "=" ? "\"" + _val + "\"" : _action)
-				await writeConfig("setting", setting)
+				await c.write("setting", c.setting)
 			}
 			Log(serialize(W ? pa_o[k]: o, { indent: 2 }))
 
@@ -323,7 +317,7 @@ const fun = {
 
 	config_edit: async(_file) => {
 		const path = process.env.XBQG_DATA + "/" + (_file ?? "setting") + ".json"
-		const editor = exT(setting.editor, { path })
+		const editor = exT(c.setting.editor, { path })
 
 		Div("config edit", 0, 2)
 		Log("Running " + Hili("$ " + editor))
@@ -347,31 +341,31 @@ const fun = {
 		}
 
 		Log("Reseting.")
-		await writeConfig("setting", configDft.setting)
+		await c.write("setting", c_dft.setting)
 		Log("Done.")
 		Div("EOF", 1, 1)
 	},
 
 	pagewarner_stat: async($after_fetching) => {
-		pagewarner = pagewarner ?? await readConfig("pagewarner")
+		c.pagewarner = c.pagewarner ?? await c.read("pagewarner")
 
-		const n = pagewarner[today] ?? 0, m = setting.pagewarner.warnNum
+		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner.warnNum
 
 		Div("pagewarner stat", 0, 2)
 		if (n <= m) {
-			if (setting.pagewarner.onlyWarnAfterFetching === true) return
+			if (c.setting.pagewarner.onlyWarnAfterFetching === true) return
 
 			Log(`Reading progress today: [${n} / ${m}]`)
 			Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
-			const l = setting.pagewarner.progressStyle.stat.length
+			const l = c.setting.pagewarner.progressStyle.stat.length
 			let nc = parseInt(n / m * l)
 			if (nc < 0) nc = 0
 			exTLog(
-				setting.pagewarner.progressStyle.stat.fommat,
+				c.setting.pagewarner.progressStyle.stat.fommat,
 				"setting.pagewarner.progressStyle.stat.fommat", {
-					progress: (_, f, b) =>
-						Hili(Cc(f, _.param(0, "fore")).char().r.repeat(nc)) +
-						Cc(b, _.param(1, "back")).char().r.repeat(l - nc),
+					progress: ($, f, b) =>
+						Hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
+						Cc(b, $.param(1, "back")).char().r.repeat(l - nc),
 					percent: (n / m).toPercent()
 				}
 			)
@@ -385,17 +379,17 @@ const fun = {
 	},
 
 	pagewarner_diff: async() => {
-		pagewarner = pagewarner ?? await readConfig("pagewarner")
+		c.pagewarner = c.pagewarner ?? await c.read("pagewarner")
 
 		Div("pagewarner diff", 0, 2)
 
-		const l = setting.pagewarner.progressStyle.diff.length
-		let m = l; for (let d in pagewarner) if (pagewarner[d] > m) m = pagewarner[d]
+		const l = c.setting.pagewarner.progressStyle.diff.length
+		let m = l; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
 
-		for (let d in pagewarner) {
-			const n = pagewarner[d]
+		for (let d in c.pagewarner) {
+			const n = c.pagewarner[d]
 			exTLog(
-				setting.pagewarner.progressStyle.diff.fommat,
+				c.setting.pagewarner.progressStyle.diff.fommat,
 				"setting.pagewarner.progressStyle.diff.fommat", {
 					date: d,
 					progress: (_, f) =>
@@ -411,38 +405,39 @@ const fun = {
 	interactive: async() => {
 		Div("interactive", 0, 2)
 		
-		if (interactive) {
+		if (flag.interactive) {
 			Warn("Already in interactive mode.")
 			Div("EOF", 1, 1)
 			return
 		}
 
-		interactive = true
+		flag.interactive = true
 
-		const rl = readline.createInterface({
+		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			prompt: setting.interactive.prompt
+			prompt: c.setting.interactive.prompt
 		})
-		rl.prompt()
-		rl.on("line", async(cmd) => {
+		rln.prompt()
+		rln.on("line", async(cmd) => {
 			if (! cmd.trim()) {
-				rl.prompt()
+				rln.prompt()
 				return
 			}
-			help = 1
+			flag.help = true
+
 			await program.parseAsync(cmd.split(" "), { from: "user" })
 			
-			rl.prompt()
+			rln.prompt()
 		})
-		rl.on("close", () => {
+		rln.on("close", () => {
 			Div("EOF", 2, 1)
 		})
 	},
 
 	help: async(_theme) => {
-		if (! help) return
-		help --
+		if (! flag.help) return
+		flag.help = false
 
 		Div("help", 0, 2)
 
@@ -455,7 +450,7 @@ const fun = {
 			opt = o => {
 				const alias = o.flags.split(", ").map(f => f.replace(/[^-]/g, s => Hili(s))).join(" | ")
 				return "\n" +
-					alias + " ".repeat(20 - len(alias)) +
+					alias + " ".repeat(25 - len(alias)) +
 					o.description
 			},
 			cmd = c => {
@@ -491,11 +486,11 @@ const fun = {
 		}
 		Div("EOF", 1, 1)
 		
-		if (! interactive) process.exit(0)
+		if (! flag.interactive) process.exit(0)
 	}
 }
 
-const configDft = {
+const c_dft = {
 	setting: {
 	  editor: "vi ${path}",
 	  interactive: {
@@ -535,7 +530,7 @@ const configDft = {
 	        ]
 	      },
 	      "xbqg": {
-	        url: "https://www.xsbiquge.com/${page}.html",
+	        url: "https://www.vbiquge.com/${page}.html",
 	        charset: "utf8",
 	        matcher: {
 	          bookName: {
@@ -683,55 +678,68 @@ const configDft = {
 	pagewarner: {}
 }
 
-// :: Beautiful Init
+// :: Init
 
-async function init() {
-	const color = () => {
-		options = program.opts()
-		if (! options.color) logger.opt.noColor = true
+const pre = async(pass) => {
+	options = program.opts()
+	if (! options.color) logger.opt.noColor = true
+
+	if (pass) return
+
+	if (! (
+		p_data = options.path ?? process.env.XBQG_DATA?.replace(/\/$/, "")
+	)) {
+		Div("init", 0, 2)
+		Err("Please set the environment variable `$XBQG_DATA` to a non-root dir.")
 	}
 
-	for (let [ n, f ] of Object.entries(fun)) {
-		const ps = f.toString().match(/(async)?\((.*)\)/)?.[2]
-		program
-			.command(n + (ps
-				? ps.split(", ").filter(p => p[0] !== "$")	// Note: Private parameter.
-					.map(p => (p[0] === "_"
-						? ` [${p.slice(1)}]`				// Note: Optional parameter.
-						: ` <${p}>`							// Note: Necessary parameter.
-					)).join(" ")
-				: ""
-			))
-			.aliases(info[n][0])
-			.description(info[n][1].join("\n"))
-			.action(async(...P) => {
-				color()
-
-				p_data = process.env.XBQG_DATA?.replace(/\/$/, "")
-				if (! p_data) {
-					Div("init", 0, 2)
-					Err("Please config the environment variable `XBQG_DATA` to a non-root dir.")
-				}
-
-				for (let i in configDft)
-					if (! await existFile(`${p_data}/${i}.json`))
-						writeConfig(i, configDft[i])
-				setting = await readConfig("setting")
-
-				await f(...P)
-			})
+	for (let i in c_dft) {
+		c[i] = {}
+		// TODO: Paralel checking.
+		if (! await existFile(`${p_data}/${i}.json`))
+			c.write(i, c_dft[i])
 	}
-
-	program.help = () => { // Hack: Kill original help.
-		color()
-		fun.help()
-	}
-	program
-		.helpOption(false)
-		.version("3.0.0", "-v, --version")
-		.option("-n, --no-color", "disable colored output")
-		.parse(process.argv)
+	c.setting = await c.read("setting")
 }
 
-init()
+for (let n in fun) {
+	fun[n] = new Proxy(fun[n], {
+		apply: (f, _, $) => {
+			if (! flag.pre) {
+				if (n === "help" && $[0]?.error) {
+					flag.help = true
+					$[0] = null
+				}
+				else pre()
+				flag.pre = true
+				f(...$)
+			}
+		}
+	})
+}
+
+for (let [ n, f ] of Object.entries(fun)) {
+	const ps = f.toString().match(/(async)?\((.*)\)/)?.[2] // Hack: I know this is wrong but...
+	program
+		.command(n + (ps
+			? ps.split(", ").filter(p => p[0] !== "$")	// Note: Private parameter.
+				.map(p => (p[0] === "_"
+					? ` [${p.slice(1)}]`				// Note: Optional parameter.
+					: ` <${p}>`							// Note: Necessary parameter.
+				)).join(" ")
+			: ""
+		))
+		.aliases(info[n][0])
+		.description(info[n][1].join("\n"))
+		.action(f)
+}
+
+program.help = fun.help // Hack: Kill original help.
+
+program
+	.helpOption(false)
+	.version("3.0.0", "-v, --version")
+	.option("-n, --no-color", "disable colored output")
+	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
+	.parse(process.argv)
 
