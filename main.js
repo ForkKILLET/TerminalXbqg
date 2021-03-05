@@ -46,8 +46,15 @@ const writeJSON = (p, data) => new Promise((resolve, reject) =>
 // :: Logic
 
 const c = {
-	read: async(fn, noParse) => await readJSON(`${p_data}/${fn}.json`, noParse),
-	write: async(fn, data) => await writeJSON(`${p_data}/${fn}.json`, data)
+	read: async(n, force) => {
+		if (force && c[n]) return c[n]
+		c[n] = await readJSON(`${p_data}/${n}.json`)
+	},
+	read_json: async(n) => await readJSON(`${p_data}/${n}.json`),
+	write: async(n, data) => {
+		if (data) c[n] = data
+		await writeJSON(`${p_data}/${n}.json`, c[n])
+	}
 }
 const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
 const flag = {
@@ -63,7 +70,7 @@ const info = {
 												 "Show the active `source` when no argument is given." ] ],
 	"fetch_prev":		[ [ "[",	"fp"	], [ "Fetch the `prev`ious page." ] ],
 	"fetch_curr":		[ [ "=",	"fc"	], [ "Fetch the `curr`ent page." ] ],
-	"fetch_next":		[ [ "]",	"fn"	], [ "Fetch the `next` page." ] ],
+	"fetch_next":		[ [ "]",	"n"		], [ "Fetch the `next` page." ] ],
 	"around":			[ [ "-",	"a"		], [ "Show `arround` inforamtion,",
 												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
 	"book_show":		[ [ "@-",	"bs"	], [ "Show your `bookcase`." ] ],
@@ -89,17 +96,24 @@ const info = {
 												 "Show usage when no arguments is given."] ],
 }
 
+const info_interactive = {
+	"exit":		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
+	"clear":	[ [ "-",	"c" ], [ "Clear the console." ] ],
+	"eval":		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
+	"dump":		[ [ "=",	"d"	], [ "Show the value of one of the configuration files in the memory." ] ],
+}
+
 const fetch_alias = name => async() => {
 	Div("page info", 0, 1)
 
-	c.around = await c.read("around")
+	await c.read("around")
 	const src = c.setting.source.active, page = c.around[src]?.[name]
 
 	if (page) {
-		c.pagewarner = await c.read("pagewarner")
+		await c.read("pagewarner")
 		if (Is.udf(c.pagewarner[today])) c.pagewarner[today] = 0
 		else c.pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
-		await c.write("pagewarner", c.pagewarner)
+		await c.write("pagewarner")
 
 		Log(`${name}: ${page}`)
 		await fun.fetch(page)
@@ -167,12 +181,12 @@ const fun = {
 		}
 		Log(JSON.stringify(a, null, 2))
 
-		c.around = c.around ?? await c.read("around")
+		await c.read("around")
 		a.title = chapterTitle
 		a.time = + new Date()
 		c.around[s] = a
 
-		await c.write("around", c.around)
+		await c.write("around")
 
 		await fun.pagewarner_stat(true)
 
@@ -186,7 +200,7 @@ const fun = {
 	around: async() => {
 		Div("around", 0, 2)
 
-		c.around = await c.read("around")
+		await c.read("around")
 		Log(serialize(c.around[c.setting.source.active], { indent: 2 }))
 
 		Div("EOF", 1, 1)
@@ -212,15 +226,15 @@ const fun = {
 	book_show: async() => {
 		Div("book show", 0, 2)
 		// TODO: better display
-		Log(await c.read("books", true))
+		Log(await c.read_json("books"))
 		Div("EOF", 1, 1)
 	},
 
 	book_mark: async(_name) => {
 		Div("book mark", 0, 2)
 
-		c.around = await c.read("around")
-		c.books = await c.read("books")
+		await c.read("around")
+		await c.read("books")
 
 		const src = c.setting.source.active
 		const re = RegExp(c.setting.source.list[src].matchKeyInArround)
@@ -249,7 +263,7 @@ const fun = {
 		Div("book fetch", 0, 1)
 
 		if (! name) Err("Book name can't be null.")
-		c.books = await c.read("books")
+		await c.read("books")
 
 		for (let i in c.books) if (i.startWith(name)) {
 			const src = c.setting.source.active, a = c.books[i][src]
@@ -316,17 +330,20 @@ const fun = {
 	},
 
 	config_edit: async(_file) => {
-		const path = process.env.XBQG_DATA + "/" + (_file ?? "setting") + ".json"
+		const path = p_data + "/" + (_file ?? "setting") + ".json"
 		const editor = exT(c.setting.editor, { path })
 
 		Div("config edit", 0, 2)
 		Log("Running " + Hili("$ " + editor))
 
 		try {
+			if (flag.interactive) rln.pause()
 			await execa.command(editor, {
 				stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
 			})
-		} catch {}
+			if (flag.interactive) rln.resume()
+		}
+		catch {}
 
 		Log(`Done.`)
 		Div("EOF", 1, 1)
@@ -336,7 +353,7 @@ const fun = {
 		Div("config reset", 0, 2)
 
 		if (_now !== "now") {
-			Warn("The default setting will be restored in 5 sec.")
+			Warn("The default setting will be restored in 5 seconds.")
 			await sleep(5000)
 		}
 
@@ -347,7 +364,7 @@ const fun = {
 	},
 
 	pagewarner_stat: async($after_fetching) => {
-		c.pagewarner = c.pagewarner ?? await c.read("pagewarner")
+		await c.read("pagewarner")
 
 		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner.warnNum
 
@@ -379,7 +396,7 @@ const fun = {
 	},
 
 	pagewarner_diff: async() => {
-		c.pagewarner = c.pagewarner ?? await c.read("pagewarner")
+		c.pagewarner = await c.read("pagewarner")
 
 		Div("pagewarner diff", 0, 2)
 
@@ -411,8 +428,7 @@ const fun = {
 			return
 		}
 
-		flag.interactive = true
-
+		flag.interactive = true // Note: Avoid duplicated interactive mode.
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
@@ -694,51 +710,48 @@ const pre = async(pass) => {
 	}
 
 	for (let i in c_dft) {
-		c[i] = {}
-		// TODO: Paralel checking.
-		if (! await existFile(`${p_data}/${i}.json`))
-			c.write(i, c_dft[i])
+		if (await existFile(`${p_data}/${i}.json`))
+			await c.read(i)
+		else await c.write(i, c_dft[i])
 	}
-	c.setting = await c.read("setting")
 }
 
 for (let n in fun) {
+	info[n].push(fun[n].toString().match(/(async)?\((.*)\)/)?.[2])
+
 	fun[n] = new Proxy(fun[n], {
-		apply: (f, _, $) => {
+		apply: async(f, _, $) => {
 			if (! flag.pre) {
 				if (n === "help" && $[0]?.error) {
 					flag.help = true
 					$[0] = null
 				}
-				else pre()
+				await pre(flag.help)
 				flag.pre = true
-				f(...$)
 			}
+			await f(...$)
 		}
 	})
-}
-
-for (let [ n, f ] of Object.entries(fun)) {
-	const ps = f.toString().match(/(async)?\((.*)\)/)?.[2] // Hack: I know this is wrong but...
+	
 	program
-		.command(n + (ps
-			? ps.split(", ").filter(p => p[0] !== "$")	// Note: Private parameter.
-				.map(p => (p[0] === "_"
-					? ` [${p.slice(1)}]`				// Note: Optional parameter.
-					: ` <${p}>`							// Note: Necessary parameter.
-				)).join(" ")
-			: ""
-		))
-		.aliases(info[n][0])
-		.description(info[n][1].join("\n"))
-		.action(f)
+	.command(n + (info[n][2]
+		? info[n][2].split(", ").filter(p => p[0] !== "$")	// Note: Private parameter.
+			.map(p => (p[0] === "_"
+				? ` [${p.slice(1)}]`						// Note: Optional parameter.
+				: ` <${p}>`									// Note: Necessary parameter.
+			)).join(" ")
+		: ""
+	))
+	.aliases(info[n][0])
+	.description(info[n][1].join("\n"))
+	.action(fun[n])
 }
 
 program.help = fun.help // Hack: Kill original help.
 
 program
 	.helpOption(false)
-	.version("3.0.0", "-v, --version")
+	.version("3.1.3", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
