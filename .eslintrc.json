@@ -15,6 +15,7 @@
 		"no-useless-escape": 0,
 		"no-debugger": 0,
 		"no-control-regex": 0,
-		"no-constant-condition": 0
+		"no-constant-condition": 0,
+		"no-unused-vars": 1
     }
 }
