@@ -69,19 +69,20 @@ const flag = {
 let options, p_data, rln = null
 
 const info = {
-	"fetch":			[ [ ":",	"f"		], [ "Fetch a page by specific `page` id." ] ],
-	"source":			[ [ ":=",	"s"		], [ "Modify the active `source`.",
+	fetch:				[ [ ":",	"f"		], [ "Fetch a page by specific `page` id." ] ],
+	source:				[ [ ":=",	"s"		], [ "Modify the active `source`. Prefix matching is OK.",
 												 "Show the active `source` when no argument is given." ] ],
-	"fetch_prev":		[ [ "[",	"fp"	], [ "Fetch the `prev`ious page." ] ],
-	"fetch_curr":		[ [ "=",	"fc"	], [ "Fetch the `curr`ent page." ] ],
-	"fetch_next":		[ [ "]",	"n"		], [ "Fetch the `next` page." ] ],
-	"around":			[ [ "-",	"a"		], [ "Show `arround` information,",
+	fetch_prev:			[ [ "[",	"fp"	], [ "Fetch the `prev`ious page." ] ],
+	fetch_curr:			[ [ "=",	"fc"	], [ "Fetch the `curr`ent page." ] ],
+	fetch_next:			[ [ "]",	"n"		], [ "Fetch the `next` page." ] ],
+	around:				[ [ "-",	"a"		], [ "Show `arround` information,",
 												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
-	"book_show":		[ [ "@-",	"bs"	], [ "Show your `bookcase`." ] ],
-	"book_mark":		[ [ "@+",	"bm"	], [ "Add the current page to your `bookcase` and give it a `name`.",
+	book_show:			[ [ "@-",	"bs"	], [ "Show your `bookcase`." ] ],
+	book_mark:			[ [ "@+",	"bm"	], [ "Add the current page to your `bookcase` and give it a `name`.",
 												 "Update when the book `name` already exists." ] ],
-	"book_fetch":		[ [ "@:",	"bf"	], [ "Fetch the page you read before of a named book in your `bookcase`." ] ],
-	"config":			[ [ "%",	"c"		], [ "Print the whole configuration when no arguments is given.",
+	book_fetch:			[ [ "@:",	"bf"	], [ "Fetch the page you read before of a named book in your `bookcase`.",
+												 "Prefix matching is OK." ] ],
+	config:				[ [ "%",	"c"		], [ "Print the whole configuration when no arguments is given.",
 												 "Print a specific item by the given `JSON path`.",
 												 "e.g. `xbqg c a.b[42].c`",
 												 "Delete the specific item.",
@@ -89,22 +90,22 @@ const info = {
 												 "Modify the specific item. Argument `=` turns the `value` into a string.",
 												 "e.g. `xbqg c a.boolean true` and",
 												 "     `xbqg c a.string = true` or `xbqg c a.string \\\"true\\\"`" ] ],
-	"config_edit":		[ [ "%+",	"ce"	], [ "Edit a configuration JSON file by your %`editor`.",
+	config_edit:		[ [ "%+",	"ce"	], [ "Edit a configuration JSON file by your %`editor`.",
 												 "In default, `setting.json`." ] ],
-	"config_reset":		[ [ "%=",	"cr"	], [ "Reset your configuration to the default in 5 seconds.",
+	config_reset:		[ [ "%=",	"cr"	], [ "Reset your configuration to the default in 5 seconds.",
 												 "The task is immediately done when `now` is given." ] ],
-	"pagewarner_stat":	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
-	"pagewarner_diff":	[ [ "^=",	"pd"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
-	"interactive":		[ [ "!",	"i"		], [ "Enter the `interactive` mode." ] ],
-	"help":				[ [ "?",	"h"		], [ "Show help of the given `theme` or `command name`.",
+	pagewarner_stat:	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
+	pagewarner_diff:	[ [ "^=",	"pd"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
+	interactive:		[ [ "!",	"i"		], [ "Enter the `interactive` mode." ] ],
+	help:				[ [ "?",	"h"		], [ "Show help of the given `theme` or `command name`.",
 												 "Show usage when no arguments is given."] ],
 }
 
 const info_i = {
-	"exit":		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
-	"clear":	[ [ "-",	"c" ], [ "Clear the console." ] ],
-	"eval":		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
-	"help":		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
+	exit:		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
+	clear:		[ [ "-",	"c" ], [ "Clear the console." ] ],
+	eval:		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
+	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 
 const fetch_alias = name => async() => {
@@ -214,9 +215,15 @@ const fun = {
 		if (_src) {
 			Div("source switch", 0, 1)
 
-			c.setting.source.active = _src
-			await c.write("setting", c.setting)
-			Log("Succeed.")
+			_src = Object.keys(c.setting.source.list).find(n => n !== "global" && n.startWith(_src))
+			
+			if (_src) {
+				c.setting.source.active = _src
+
+				await c.write("setting")
+				Log(`Succeed, switching source to \`${_src}\`.`)
+			}
+			else Warn("Not found.")
 
 			Div("EOF", 0, 1)
 		}
@@ -269,16 +276,15 @@ const fun = {
 		if (! name) Err("Book name can't be null.")
 		await c.read("books")
 
-		for (let i in c.books) if (i.startWith(name)) {
-			const src = c.setting.source.active, a = c.books[i][src]
-			if (a) {
-				Log("Succeeded.")
-				await fun.fetch(a.curr)
-			}
-			else {
-				Warn("Not found.")
-				Div("EOF", 0, 1)
-			}
+		name = Object.keys(c.books).find(n => n.startWith(name))
+		const a = c.books[name][c.setting.source.active]
+		if (a) {
+			Log(`Succeeded, fetching book \`${name}\`.`)
+			await fun.fetch(a.curr)
+		}
+		else {
+			Warn("Not found.")
+			Div("EOF", 0, 1)
 		}
 	},
 
@@ -694,7 +700,6 @@ const pre = async(pass) => {
 
 const init_program = (p, i, f, u) => {
 	f.help = async(_theme) => {
-		console.log(flag)
 		if (! flag.help) return
 		flag.help = false
 
@@ -707,9 +712,9 @@ const init_program = (p, i, f, u) => {
 			pad = x =>  " ".repeat(noPadding === true ? 1 : x),
 			
 			opt = o => {
-				const alias = o.flags.split(", ").map(f => f.replace(/[^-]/g, s => Hili(s))).join(" | ")
+				const value = o.flags.split(", ").map(f => f.replace(/[^-<>]/g, s => Hili(s))).join(" | ")
 				return "\n" +
-					alias + " ".repeat(25 - len(alias)) +
+					value + " ".repeat(25 - len(value)) +
 					o.description
 			},
 			cmd = c => {
@@ -794,7 +799,7 @@ init_program(program, info, fun, () =>
 
 program
 	.helpOption(false)
-	.version("3.1.6", "-v, --version")
+	.version("3.1.7", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
