@@ -103,7 +103,8 @@ const info = {
 const info_i = {
 	"exit":		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
 	"clear":	[ [ "-",	"c" ], [ "Clear the console." ] ],
-	"eval":		[ [ "+",	"v"	], [ "Run Javascript code." ] ]
+	"eval":		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
+	"help":		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 
 const fetch_alias = name => async() => {
@@ -162,7 +163,7 @@ const fun = {
 			const m = matcher[i]
 			blocks[i] = blocks[m.from]?.match(RegExp(m.regexp))?.[m.group ?? 1]
 			if (m.necessary && ! blocks[i])
-				Err(`Block "${i}" mismatched.\nsource name: "${s}"`)
+				Log(blocks), Err(`Block "${i}" mismatched.\nsource name: "${s}"`)
 		}
 
 		for (let r of replacer)
@@ -426,6 +427,7 @@ const fun = {
 		)
 
 		Div("interactive", 0, 2)
+		Log("Use `!help`, `!h` or `!?` to get interactive instruction usage.")
 		
 		flag.interactive = true // Note: Avoid duplicated interactive mode.
 		rln = readline.createInterface({
@@ -459,60 +461,6 @@ const fun = {
 		rln.on("close", () => {
 			Div("EOF", 2, 1)
 		})
-	},
-
-	help: async(_theme) => {
-		if (! flag.help) return
-		flag.help = false
-
-		Div("help", 0, 2)
-
-		let noPadding = false
-
-		const
-			len = s => s.replace(/\x1B\[.+?m/g, "").length,
-			pad = x =>  " ".repeat(noPadding === true ? 1 : x),
-			
-			opt = o => {
-				const alias = o.flags.split(", ").map(f => f.replace(/[^-]/g, s => Hili(s))).join(" | ")
-				return "\n" +
-					alias + " ".repeat(25 - len(alias)) +
-					o.description
-			},
-			cmd = c => {
-				const
-					argument = c._args.map(arg => {
-						const n = Hili(arg.name + (arg.variadic ? "..." : ""))
-						return arg.required ? "<" + n + ">" : "[" + n + "]"
-					}).join(" ") || "-",
-					alias = Hili(c._name) +
-						(c._aliases.map(a => " | " + Hili(a)).join(""))
-				return "\n" +
-					alias + pad(30 - len(alias)) +
-					argument + pad(25 - len(argument)) + (
-					noPadding
-						? "\n" + c.description()
-						: c.description().replace(/\n/g, "\n" + pad(55))
-					)
-			}
-
-		if (! _theme || Is.obj(_theme) && _theme.error === true) // Hack: Kill original help.
-			Log(
-				"OPTIONS\n" + program.options.map(opt).join("") + "\n\n" +
-				"COMMANDS\n" + program.commands.map(cmd).join("")
-			)
-		else {
-			let id
-			Object.entries(info).forEach((v, k) => {
-				const i = [ v[0], ...v[1][0] ].indexOf(_theme)
-				if (i >= 0) id = k
-			})
-			noPadding = true
-			if (! Is.undef(id)) Log("COMMANDS\n" + cmd(program.commands[id]))
-		}
-		Div("EOF", 1, 1)
-		
-		if (! flag.interactive) process.exit(0)
 	}
 }
 
@@ -745,7 +693,61 @@ const pre = async(pass) => {
 }
 
 const init_program = (p, i, f, u) => {
-	for (let n in f) {
+	f.help = async(_theme) => {
+		if (! flag.help) return
+		flag.help = false
+
+		Div("help", 0, 2)
+
+		let noPadding = false
+
+		const
+			len = s => s.replace(/\x1B\[.+?m/g, "").length,
+			pad = x =>  " ".repeat(noPadding === true ? 1 : x),
+			
+			opt = o => {
+				const alias = o.flags.split(", ").map(f => f.replace(/[^-]/g, s => Hili(s))).join(" | ")
+				return "\n" +
+					alias + " ".repeat(25 - len(alias)) +
+					o.description
+			},
+			cmd = c => {
+				const
+					argument = c._args.map(arg => {
+						const n = Hili(arg.name + (arg.variadic ? "..." : ""))
+						return arg.required ? "<" + n + ">" : "[" + n + "]"
+					}).join(" ") || "-",
+					alias = Hili(c._name) +
+						(c._aliases.map(a => " | " + Hili(a)).join(""))
+				return "\n" +
+					alias + pad(30 - len(alias)) +
+					argument + pad(25 - len(argument)) + (
+					noPadding
+						? "\n" + c.description()
+						: c.description().replace(/\n/g, "\n" + pad(55))
+					)
+			}
+
+		if (! _theme || _theme.error === true) // Hack: Kill original help.
+			Log(
+				(p === program ? "OPTIONS\n" + p.options.map(opt).join("") + "\n\n" : "") +
+				"COMMANDS\n" + p.commands.map(cmd).join("")
+			)
+		else {
+			let id
+			Object.entries(i).forEach((v, k) => {
+				const i = [ v[0], ...v[1][0] ].indexOf(_theme)
+				if (i >= 0) id = k
+			})
+			noPadding = true
+			if (! Is.udf(id)) Log("COMMANDS\n" + cmd(p.commands[id]))
+		}
+		Div("EOF", 1, 1)
+		
+		if (! flag.interactive) process.exit(0)
+	}
+
+	for (let n in i) {
 		i[n].push(f[n].toString().match(/^(async)?\((.*)\)/)?.[2])
 
 		f[n] = new Proxy(f[n], {
@@ -774,6 +776,7 @@ const init_program = (p, i, f, u) => {
 			.aliases(i[n][0])
 			.description(i[n][1].join("\n"))
 			.action(f[n])
+			.helpOption(false)
 	}
 
 	p.help = f.help // Hack: Kill original help.
@@ -791,7 +794,7 @@ init_program(program, info, fun, () =>
 
 program
 	.helpOption(false)
-	.version("3.1.5", "-v, --version")
+	.version("3.1.6", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
