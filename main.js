@@ -694,6 +694,7 @@ const pre = async(pass) => {
 
 const init_program = (p, i, f, u) => {
 	f.help = async(_theme) => {
+		console.log(flag)
 		if (! flag.help) return
 		flag.help = false
 
@@ -728,11 +729,10 @@ const init_program = (p, i, f, u) => {
 					)
 			}
 
-		if (! _theme || _theme.error === true) // Hack: Kill original help.
-			Log(
-				(p === program ? "OPTIONS\n" + p.options.map(opt).join("") + "\n\n" : "") +
-				"COMMANDS\n" + p.commands.map(cmd).join("")
-			)
+		if (! _theme) Log(
+			(p === program ? "OPTIONS\n" + p.options.map(opt).join("") + "\n\n" : "") +
+			"COMMANDS\n" + p.commands.map(cmd).join("")
+		)
 		else {
 			let id
 			Object.entries(i).forEach((v, k) => {
@@ -753,7 +753,7 @@ const init_program = (p, i, f, u) => {
 		f[n] = new Proxy(f[n], {
 			apply: async(f, _, $) => {
 				if (! flag.pre) {
-					if (n === "help" && $[0]?.error) {
+					if (n === "help") {
 						flag.help = true
 						$[0] = null
 					}
