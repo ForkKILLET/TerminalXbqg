@@ -1,6 +1,6 @@
 #!/bin/env node
 
-// :: Import
+// :: Dep
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -66,7 +66,7 @@ const flag = {
 	interactive: false,
 	help: false,
 }
-let options, p_data, rln = null
+let options, p_data, rln
 
 const info = {
 	fetch:				[ [ ":",	"f"		], [ "Fetch a page by specific `page` id." ] ],
@@ -97,6 +97,8 @@ const info = {
 	pagewarner_stat:	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
 	pagewarner_diff:	[ [ "^=",	"pd"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
 	interactive:		[ [ "!",	"i"		], [ "Enter the `interactive` mode." ] ],
+	history:			[ [ "~",	"hi"	], [ "Show history." ] ],
+	history_reset:		[ [ "~=",	"hr"	], [ "Reset history." ] ],
 	help:				[ [ "?",	"h"		], [ "Show help of the given `theme` or `command name`.",
 												 "Show usage when no arguments is given."] ],
 }
@@ -112,7 +114,7 @@ const fetch_alias = name => async() => {
 	Div("page info", 0, 1)
 
 	await c.read("around")
-	const src = c.setting.source.active, page = c.around[src]?.[name]
+	const page = c.around[c.setting.source.active]?.[name]
 
 	if (page) {
 		await c.read("pagewarner")
@@ -221,7 +223,7 @@ const fun = {
 				c.setting.source.active = _src
 
 				await c.write("setting")
-				Log(`Succeed, switching source to \`${_src}\`.`)
+				Log(`Switching source to \`${_src}\`.`)
 			}
 			else Warn("Not found.")
 
@@ -247,15 +249,15 @@ const fun = {
 		await c.read("around")
 		await c.read("books")
 
-		const src = c.setting.source.active
-		const re = RegExp(c.setting.source.list[src].matchKeyInArround)
-		const key = c.around[src]?.curr.match(re)[1]
+		const s = c.setting.source.active
+		const re = RegExp(c.setting.source.list[s].matchKeyInArround)
+		const key = c.around[s]?.curr.match(re)[1]
 
 		if (! key) Err("No around is found.")
 
 		let newBook = true
 		for (let i in c.books)
-			if (c.books[i][src]?.curr.match(re)[1] === key) {
+			if (c.books[i][s]?.curr.match(re)[1] === key) {
 				newBook = false
 				_name = i
 			}
@@ -263,7 +265,7 @@ const fun = {
 		if (newBook && ! _name)
 			Err("Book name can't be null when adding new book.")
 		if (! c.books[_name]) c.books[_name] = {}
-		c.books[_name][src] = c.around[src]
+		c.books[_name][s] = c.around[s]
 
 		await c.write("books", c.books)
 		Log(newBook ? "Added." : "Updated.")
@@ -277,15 +279,21 @@ const fun = {
 		await c.read("books")
 
 		name = Object.keys(c.books).find(n => n.startWith(name))
-		const a = c.books[name][c.setting.source.active]
-		if (a) {
-			Log(`Succeeded, fetching book \`${name}\`.`)
-			await fun.fetch(a.curr)
+		const a = c.books[name]
+		let s = c.setting.source.active
+		if (a[s]) ;
+		else if (c.setting.source.autoSwitching) {
+			Log(`Auto switching source to \`${s}\`.`)
+			c.setting.source.active = s = Object.keys(a)[0]
+			await c.write("setting")
 		}
 		else {
 			Warn("Not found.")
 			Div("EOF", 0, 1)
+			return
 		}
+		Log(`Fetching book \`${name}\`.`)
+		await fun.fetch(a[s].curr)
 	},
 
 	config: async(_path, _action, _val) => {
@@ -428,6 +436,12 @@ const fun = {
 	},
 
 	interactive: async() => {
+		if (flag.interactive) {
+			Warn("Already in interactive mode.")
+			rln.prompt()
+			return
+		}
+
 		init_program(program_i, info_i, fun_i, () =>
 			Warn("Unknown interactive instruction.")
 		)
@@ -435,12 +449,20 @@ const fun = {
 		Div("interactive", 0, 2)
 		Log("Use `!help`, `!h` or `!?` to get interactive instruction usage.")
 		
-		flag.interactive = true // Note: Avoid duplicated interactive mode.
+		flag.interactive = true
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			prompt: exT(c.setting.interactive.prompt, { hili: s => Hili(s) })
+			prompt: exT(c.setting.interactive.prompt, { hili: s => Hili(s) }),
+			removeHistoryDuplicates: true
 		})
+		
+		let n = c.setting.history.loadToInteractive
+		if (n) {
+			await c.read("history")
+			rln.history = c.history.slice(- n).reverse()
+		}
+
 		rln.prompt()
 		rln.on("line", async(cmd) => {
 			if (! cmd.trim()) {
@@ -449,24 +471,40 @@ const fun = {
 			}
 			flag.help = true
 
-			let p = program
-			if (cmd[0] === "!") {
-				cmd = cmd.slice(1)
-				if (! cmd) {
-					Warn("Already in interactive mode.")
-					rln.prompt()
-					return
-				}
-				else p = program_i
+			let p = program, s = cmd
+			if (s[0] === "!") {
+				s = s.slice(1)
+				p = program_i
 			}
 
-			await p.parseAsync(cmd.split(" "), { from: "user" })
+			await p.parseAsync(s.split(" "), { from: "user" })
+			
+			if (c.setting.history.on) {
+				c.history.push(cmd)
+				await c.write("history")
+			}
 
 			rln.prompt()
 		})
 		rln.on("close", () => {
 			Div("EOF", 2, 1)
 		})
+	},
+
+	history: async() => {
+		Div("history show", 0, 2)
+		await c.read("history")
+		Log(c.history.join("\n"))
+		Div("EOF", 1, 1)
+	},
+
+	history_reset: async() => {
+		Div("history reset", 0, 2)
+
+		Log("Reseting.")
+		await c.write("history", c_dft.history)
+		Log("Done.")
+		Div("EOF", 1, 1)
 	}
 }
 
@@ -482,7 +520,12 @@ const fun_i = {
 	},
 	eval: (code) => {
 		Div("evaluate", 0, 1)
-		Log(eval(code))
+		try {
+			Log(eval(code))
+		}
+		catch (e) {
+			Warn(e)
+		}
 		Div("EOF", 0, 1)
 	}
 }
@@ -509,7 +552,8 @@ const c_dft = {
 	    }
 	  },
 	  source: {
-	    active: "kenshuge",
+	    active: "xbqg",
+		autoSwitching: true,
 	    list: {
 	      "global": {
 	        matcher: {
@@ -669,8 +713,13 @@ const c_dft = {
 	        matchKeyInArround: /(.*)\//
 	      }
 	    }
-	  }
+	  },
+      history: {
+        on: true,
+        loadToInteractive: 10
+      }
 	},
+	history: [ "help" ],
 	around: {},
 	books: {},
 	pagewarner: {}
@@ -679,6 +728,8 @@ const c_dft = {
 // :: Init
 
 const pre = async(pass) => {
+	flag.pre = true
+
 	options = program.opts()
 	if (! options.color) logger.opt.noColor = true
 
@@ -688,14 +739,16 @@ const pre = async(pass) => {
 		p_data = options.path ?? process.env.XBQG_DATA?.replace(/\/$/, "")
 	)) {
 		Div("pre", 0, 2)
-		Err("Please set the environment variable `$XBQG_DATA` to a non-root dir.")
+		Err(
+			"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
+			"Or use `xbqg -p <p_data>` to assign it."
+		)
 	}
 
-	for (let i in c_dft) {
-		if (await existFile(`${p_data}/${i}.json`))
-			await c.read(i)
-		else await c.write(i, c_dft[i])
-	}
+	for (let fn in c_dft)
+		if (! await existFile(`${p_data}/${fn}.json`))
+			await c.write(fn, c_dft[fn])
+	await c.read("setting")
 }
 
 const init_program = (p, i, f, u) => {
@@ -763,9 +816,13 @@ const init_program = (p, i, f, u) => {
 						$[0] = null
 					}
 					await pre(flag.help)
-					flag.pre = true
 				}
 				await f(...$)
+				if (c.setting.history.on && ! flag.interactive) {
+					await c.read("history")
+					c.history.push(process.argv.slice(2).join(" "))
+					await c.write("history")
+				}
 			}
 		})
 		
@@ -799,7 +856,7 @@ init_program(program, info, fun, () =>
 
 program
 	.helpOption(false)
-	.version("3.1.7", "-v, --version")
+	.version("3.2.0", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
