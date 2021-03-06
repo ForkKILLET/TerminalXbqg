@@ -5,7 +5,7 @@
 const fs			= require("fs")
 const execa			= require("execa")
 const readline		= require("readline")
-const { program }	= require("commander")
+const { Command }	= require("commander")
 const {
 	Is, Cc, ski,
 	sleep, ajax, exTemplate: exT, serialize,
@@ -16,6 +16,10 @@ const logger = Logger().bind(), {
 	warn: Warn, errEOF: Err, log: Log,
 	exTemplateLog: exTLog, hili: Hili, div: Div
 } = logger
+const program = new Command("global"), program_i = new Command("interactive")
+const std = {
+	stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
+}
 
 // :: Tool
 
@@ -71,7 +75,7 @@ const info = {
 	"fetch_prev":		[ [ "[",	"fp"	], [ "Fetch the `prev`ious page." ] ],
 	"fetch_curr":		[ [ "=",	"fc"	], [ "Fetch the `curr`ent page." ] ],
 	"fetch_next":		[ [ "]",	"n"		], [ "Fetch the `next` page." ] ],
-	"around":			[ [ "-",	"a"		], [ "Show `arround` inforamtion,",
+	"around":			[ [ "-",	"a"		], [ "Show `arround` information,",
 												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
 	"book_show":		[ [ "@-",	"bs"	], [ "Show your `bookcase`." ] ],
 	"book_mark":		[ [ "@+",	"bm"	], [ "Add the current page to your `bookcase` and give it a `name`.",
@@ -89,18 +93,17 @@ const info = {
 												 "In default, `setting.json`." ] ],
 	"config_reset":		[ [ "%=",	"cr"	], [ "Reset your configuration to the default in 5 seconds.",
 												 "The task is immediately done when `now` is given." ] ],
-	"pagewarner_stat":	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` inforamtio  using a progress bar." ] ],
+	"pagewarner_stat":	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
 	"pagewarner_diff":	[ [ "^=",	"pd"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
 	"interactive":		[ [ "!",	"i"		], [ "Enter the `interactive` mode." ] ],
 	"help":				[ [ "?",	"h"		], [ "Show help of the given `theme` or `command name`.",
 												 "Show usage when no arguments is given."] ],
 }
 
-const info_interactive = {
+const info_i = {
 	"exit":		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
 	"clear":	[ [ "-",	"c" ], [ "Clear the console." ] ],
-	"eval":		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
-	"dump":		[ [ "=",	"d"	], [ "Show the value of one of the configuration files in the memory." ] ],
+	"eval":		[ [ "+",	"v"	], [ "Run Javascript code." ] ]
 }
 
 const fetch_alias = name => async() => {
@@ -338,9 +341,7 @@ const fun = {
 
 		try {
 			if (flag.interactive) rln.pause()
-			await execa.command(editor, {
-				stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
-			})
+			await execa.command(editor, std)
 			if (flag.interactive) rln.resume()
 		}
 		catch {}
@@ -352,7 +353,7 @@ const fun = {
 	config_reset: async(_now) => {
 		Div("config reset", 0, 2)
 
-		if (_now !== "now") {
+		if (_now !== "!") {
 			Warn("The default setting will be restored in 5 seconds.")
 			await sleep(5000)
 		}
@@ -420,19 +421,17 @@ const fun = {
 	},
 
 	interactive: async() => {
+		init_program(program_i, info_i, fun_i, () =>
+			Warn("Unknown interactive instruction.")
+		)
+
 		Div("interactive", 0, 2)
 		
-		if (flag.interactive) {
-			Warn("Already in interactive mode.")
-			Div("EOF", 1, 1)
-			return
-		}
-
 		flag.interactive = true // Note: Avoid duplicated interactive mode.
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			prompt: c.setting.interactive.prompt
+			prompt: exT(c.setting.interactive.prompt, { hili: s => Hili(s) })
 		})
 		rln.prompt()
 		rln.on("line", async(cmd) => {
@@ -442,7 +441,18 @@ const fun = {
 			}
 			flag.help = true
 
-			await program.parseAsync(cmd.split(" "), { from: "user" })
+			let p = program
+			if (cmd[0] === "!") {
+				cmd = cmd.slice(1)
+				if (! cmd) {
+					Warn("Already in interactive mode.")
+					rln.prompt()
+					return
+				}
+				else p = program_i
+			}
+
+			await p.parseAsync(cmd.split(" "), { from: "user" })
 
 			rln.prompt()
 		})
@@ -498,7 +508,7 @@ const fun = {
 				if (i >= 0) id = k
 			})
 			noPadding = true
-			if (! Is.undef(id)) Log("COMMAND\n" + cmd(program.commands[id]))
+			if (! Is.undef(id)) Log("COMMANDS\n" + cmd(program.commands[id]))
 		}
 		Div("EOF", 1, 1)
 		
@@ -506,11 +516,29 @@ const fun = {
 	}
 }
 
+const fun_i = {
+	exit: () => {
+		rln.close()
+		process.exit(0)
+	},
+	clear: async(_force) => {
+		if (_force === "!")
+			await execa.command(c.setting.interactive.forceClearCommand, std)
+		else rln.write(null, { ctrl: true, name: 'l' })
+	},
+	eval: (code) => {
+		Div("evaluate", 0, 1)
+		Log(eval(code))
+		Div("EOF", 0, 1)
+	}
+}
+
 const c_dft = {
 	setting: {
 	  editor: "vi ${path}",
 	  interactive: {
-	    prompt: "xbqg$ "
+	    prompt: "!{ hili | xbqg$ } ",
+        forceClearCommand: "clear"
 	  },
 	  pagewarner: {
 	    warnNum: 50,
@@ -716,50 +744,54 @@ const pre = async(pass) => {
 	}
 }
 
-for (let n in fun) {
-	info[n].push(fun[n].toString().match(/(async)?\((.*)\)/)?.[2])
+const init_program = (p, i, f, u) => {
+	for (let n in f) {
+		i[n].push(f[n].toString().match(/^(async)?\((.*)\)/)?.[2])
 
-	fun[n] = new Proxy(fun[n], {
-		apply: async(f, _, $) => {
-			if (! flag.pre) {
-				if (n === "help" && $[0]?.error) {
-					flag.help = true
-					$[0] = null
+		f[n] = new Proxy(f[n], {
+			apply: async(f, _, $) => {
+				if (! flag.pre) {
+					if (n === "help" && $[0]?.error) {
+						flag.help = true
+						$[0] = null
+					}
+					await pre(flag.help)
+					flag.pre = true
 				}
-				await pre(flag.help)
-				flag.pre = true
+				await f(...$)
 			}
-			await f(...$)
-		}
-	})
-	
-	program
-	.command(n + (info[n][2]
-		? info[n][2].split(", ").filter(p => p[0] !== "$")	// Note: Private parameter.
-			.map(p => (p[0] === "_"
-				? ` [${p.slice(1)}]`						// Note: Optional parameter.
-				: ` <${p}>`									// Note: Necessary parameter.
-			)).join(" ")
-		: ""
-	))
-	.aliases(info[n][0])
-	.description(info[n][1].join("\n"))
-	.action(fun[n])
-}
-
-program.help = fun.help // Hack: Kill original help.
-
-program._unknownCommand = program.unknownCommand
-program.unknownCommand = () => {
-	if (flag.interactive) {
-		Warn("Unknown command. Use `help`, `h` or `?` to get usage.")
+		})
+		
+		p
+			.command(n + (i[n][2]
+				? i[n][2].split(", ").filter(p => p[0] !== "$")		// Note: Private parameter.
+					.map(p => (p[0] === "_"
+						? ` [${p.slice(1)}]`						// Note: Optional parameter.
+						: ` <${p}>`									// Note: Necessary parameter.
+					)).join(" ")
+				: ""
+			))
+			.aliases(i[n][0])
+			.description(i[n][1].join("\n"))
+			.action(f[n])
 	}
-	else program._unknownCommand()
+
+	p.help = f.help // Hack: Kill original help.
+
+	p._unknownCommand = program.unknownCommand
+	p.unknownCommand = () => {
+		if (flag.interactive) u()
+		else p._unknownCommand()
+	}
 }
+
+init_program(program, info, fun, () =>
+	Warn("Unknown command. Use `help`, `h` or `?` to get usage.")
+)
 
 program
 	.helpOption(false)
-	.version("3.1.4", "-v, --version")
+	.version("3.1.5", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
