@@ -443,7 +443,7 @@ const fun = {
 			flag.help = true
 
 			await program.parseAsync(cmd.split(" "), { from: "user" })
-			
+
 			rln.prompt()
 		})
 		rln.on("close", () => {
@@ -705,7 +705,7 @@ const pre = async(pass) => {
 	if (! (
 		p_data = options.path ?? process.env.XBQG_DATA?.replace(/\/$/, "")
 	)) {
-		Div("init", 0, 2)
+		Div("pre", 0, 2)
 		Err("Please set the environment variable `$XBQG_DATA` to a non-root dir.")
 	}
 
@@ -749,9 +749,17 @@ for (let n in fun) {
 
 program.help = fun.help // Hack: Kill original help.
 
+program._unknownCommand = program.unknownCommand
+program.unknownCommand = () => {
+	if (flag.interactive) {
+		Warn("Unknown command. Use `help`, `h` or `?` to get usage.")
+	}
+	else program._unknownCommand()
+}
+
 program
 	.helpOption(false)
-	.version("3.1.3", "-v, --version")
+	.version("3.1.4", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
