@@ -64,7 +64,7 @@ const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
 const flag = {
 	pre: false,
 	interactive: false,
-	help: false,
+	help: true
 }
 let options, p_data, rln
 
@@ -110,6 +110,75 @@ const info_i = {
 	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 
+const info_t = {
+	data: `
+All data files exists in \`$XBQG_DATA\` unless user gives a \`--path\` option to override it.
+Filenames cannot be changed at present.
+
+RELAVANT
+
+?setting             -> one of the data files
+`,
+	setting: `
+Since all formats of data become Javascript object when the script runs,
+Javascript style \`path\` is used below.
+
+.editor: string
+# what to edit your data files with
+interactive: object
+    prompt: string
+    # what to display before your cursor in the interactive mode
+    forceClearCommand: string
+    # how to clear the console history instead of the current screen.
+
+pagewarner: object
+    warnNum: integer
+    # how much pages you decided to read at most.
+    onlyWarnAfterFetching
+    # whether display the pagewarner after \`fetch\`ing
+      when only you reach the \`warnNum\`.
+    progressStyle: object
+        stat: object
+            length: integer
+            fommat: string
+        diff: object
+            length: integer
+            fommat: string
+
+source: object
+    active: string
+    # what source to use now among the \`list\`
+    autoSwitching: boolean
+    # whether automatically switch the source to
+      the first available one of a book when \`book_fetch\`
+    list: object
+        [source]: object
+            url: string
+            charset: string
+            matcher: object
+                [matcher]: object
+                    necessary: boolean
+                    from: string
+                    regexp: regexp
+            replacer: array
+                [index]: array
+                    0: string
+                    1: string
+            matchKeyInAround: regexp
+
+history: object
+    on: boolean
+    loadToInteractive: integer
+
+RELAVANT
+
+?data                -> where to store
+?config              -> commands to operate the configuration
+?config_reset        ~~
+?config_edit         ~~
+`
+}
+
 const fetch_alias = name => async() => {
 	Div("page info", 0, 1)
 
@@ -138,7 +207,7 @@ const fun = {
 
 		const s = c.setting.source.active, src = c.setting.source.list[s]
 		const g = c.setting.source.list.global
-		const matcher = Object.assign(g.matcher, src.matcher ?? {})
+		const matcher = Object.assign({}, g.matcher, src.matcher ?? {})
 		const replacer = g.replacer.concat(src.replacer ?? [])
 		const blocks = {}
 
@@ -157,9 +226,8 @@ const fun = {
 					}, "")
 				)
 			}
-			else
-				if (e.when === "RequestGet" && e.err.code === 'ENOTFOUND')
-					Err("Network went wrong. Please check your Wi-fi.")
+			else if (e.when === "RequestGet" && e.err.code === 'ENOTFOUND')
+				Err("Network went wrong. Please check your Wi-fi.")
 		}
 
 		for (let i in matcher) {
@@ -250,7 +318,7 @@ const fun = {
 		await c.read("books")
 
 		const s = c.setting.source.active
-		const re = RegExp(c.setting.source.list[s].matchKeyInArround)
+		const re = RegExp(c.setting.source.list[s].matchKeyInAround)
 		const key = c.around[s]?.curr.match(re)[1]
 
 		if (! key) Err("No around is found.")
@@ -283,8 +351,8 @@ const fun = {
 		let s = c.setting.source.active
 		if (a[s]) ;
 		else if (c.setting.source.autoSwitching) {
-			Log(`Auto switching source to \`${s}\`.`)
 			c.setting.source.active = s = Object.keys(a)[0]
+			Log(`Auto switching source to \`${s}\`.`)
 			await c.write("setting")
 		}
 		else {
@@ -442,9 +510,12 @@ const fun = {
 			return
 		}
 
-		init_program(program_i, info_i, fun_i, () =>
-			Warn("Unknown interactive instruction.")
-		)
+		init_program({
+			p: program_i, i: info_i, f: fun_i,
+			h: "Interactive instruction starts with a bang \`!\`.",
+			u: () =>
+				Warn("Unknown interactive instruction. Use `!help`, `!h` or `!?` to get usage.")
+		})
 
 		Div("interactive", 0, 2)
 		Log("Use `!help`, `!h` or `!?` to get interactive instruction usage.")
@@ -486,9 +557,7 @@ const fun = {
 
 			rln.prompt()
 		})
-		rln.on("close", () => {
-			Div("EOF", 2, 1)
-		})
+		rln.on("close", () => Div("EOI", 2, 1))
 	},
 
 	history: async() => {
@@ -606,7 +675,7 @@ const c_dft = {
 	            regexp: /nextpage="\/(.*?).html"/
 	          }
 	        },
-	        matchKeyInArround: /(.*)\//
+	        matchKeyInAround: /(.*)\//
 	      },
 	      "8wenku": {
 	        url: "http://www.8wenku.com/b/${page}.html",
@@ -638,7 +707,7 @@ const c_dft = {
 	            regexp: /<a href="\/b\/(.*?).html">下一章<\/a>/
 	          }
 	        },
-	        matchKeyInArround: /(.*)\//
+	        matchKeyInAround: /(.*)\//
 	      },
 	      "kenshuge": {
 	        url: "https://m.kenshuge.com/wapbook/${page}.html",
@@ -673,7 +742,7 @@ const c_dft = {
 	        replacer: [
 	          [ /\n{3,}/, "\n\n" ]
 	        ],
-	        matchKeyInArround: /(.*)_/
+	        matchKeyInAround: /(.*)_/
 	      },
 	      "ibiqu": {
 	        url: "http://www.ibiqu.net/book/${page}.htm",
@@ -710,7 +779,7 @@ const c_dft = {
 	          [ /<\/p>/, "\n" ],
 	          [ /一秒记住，精彩小说无弹窗免费阅读！/, "" ]
 	        ],
-	        matchKeyInArround: /(.*)\//
+	        matchKeyInAround: /(.*)\//
 	      }
 	    }
 	  },
@@ -751,14 +820,14 @@ const pre = async(pass) => {
 	await c.read("setting")
 }
 
-const init_program = (p, i, f, u) => {
+const init_program = ({ p, i, f, h, u }) => {
 	f.help = async(_theme) => {
 		if (! flag.help) return
 		flag.help = false
 
 		Div("help", 0, 2)
 
-		let noPadding = false
+		let noPadding = false, extra
 
 		const
 			len = s => s.replace(/\x1B\[.+?m/g, "").length,
@@ -787,10 +856,14 @@ const init_program = (p, i, f, u) => {
 					)
 			}
 
-		if (! _theme) Log(
+		if (! _theme || _theme.error) Log(
 			(p === program ? "OPTIONS\n" + p.options.map(opt).join("") + "\n\n" : "") +
-			"COMMANDS\n" + p.commands.map(cmd).join("")
+			"COMMANDS\n" + p.commands.map(cmd).join("") +
+			"\n" + h.replace(/<(.+?)>/g, (_, s) => "<" + Hili(s) + ">")
 		)
+		else if (extra = info_t[_theme]) {
+			Log(_theme.toUpperCase() + "\n" + extra)
+		}
 		else {
 			let id
 			Object.entries(i).forEach((v, k) => {
@@ -798,7 +871,8 @@ const init_program = (p, i, f, u) => {
 				if (i >= 0) id = k
 			})
 			noPadding = true
-			if (! Is.udf(id)) Log("COMMANDS\n" + cmd(p.commands[id]))
+			if (Is.num(id)) Log("COMMAND\n" + cmd(p.commands[id]))
+			else Warn("Unknown command or theme.")
 		}
 		Div("EOF", 1, 1)
 		
@@ -810,13 +884,8 @@ const init_program = (p, i, f, u) => {
 
 		f[n] = new Proxy(f[n], {
 			apply: async(f, _, $) => {
-				if (! flag.pre) {
-					if (n === "help") {
-						flag.help = true
-						$[0] = null
-					}
-					await pre(flag.help)
-				}
+				if (! flag.pre)
+					await pre(n === "help")
 				await f(...$)
 				if (c.setting.history.on && ! flag.interactive) {
 					await c.read("history")
@@ -850,13 +919,27 @@ const init_program = (p, i, f, u) => {
 	}
 }
 
-init_program(program, info, fun, () =>
-	Warn("Unknown command. Use `help`, `h` or `?` to get usage.")
-)
+init_program({
+	p: program, i: info, f: fun,
+	h: `
+CONTACT
+
+GitHub Issue         <https://github.com/ForkFG/TerminalXbqg/issues>
+Email                <fork_killet@qq.com>
+
+RELAVANT
+
+?                    -> this
+!?                   -> interactive instructions
+?data                -> data files
+?setting             -> the configuration
+`,
+	u: () => Warn("Unknown command. Use `help`, `h` or `?` to get usage.")
+})
 
 program
 	.helpOption(false)
-	.version("3.2.0", "-v, --version")
+	.version("3.2.1", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
