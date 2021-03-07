@@ -60,7 +60,7 @@ const c = {
 		await writeJSON(`${p_data}/${n}.json`, c[n])
 	}
 }
-const today = Date.fromTimeZone(+8).fommat("yyyymmdd")
+const today = new Date().format("yyyymmdd")
 const flag = {
 	pre: false,
 	interactive: false,
