@@ -109,6 +109,7 @@ const info_i = {
 	exit:		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
 	clear:		[ [ "-",	"c" ], [ "Clear the console." ] ],
 	eval:		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
+	color:		[ [ "%",	"n"	], [ "Toggle color." ] ],
 	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 
@@ -540,9 +541,9 @@ const fun = {
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			prompt: exT(c.setting.interactive.prompt, { hili: s => Hili(s) }),
 			removeHistoryDuplicates: true
 		})
+		rln.rePrompt = () => rln.setPrompt(exT(c.setting.interactive.prompt, { hili: s => Hili(s) }))
 		
 		let n = c.setting.history.loadToInteractive
 		if (n) {
@@ -550,6 +551,7 @@ const fun = {
 			rln.history = c.history.slice(- n).reverse()
 		}
 
+		rln.rePrompt()
 		rln.prompt()
 		rln.on("line", async(cmd) => {
 			if (! cmd.trim()) {
@@ -612,6 +614,11 @@ const fun_i = {
 			Warn(e)
 		}
 		Div("EOF", 0, 1)
+	},
+	color: () => {
+		Log("Color " + ((logger.opt.noColor = ! logger.opt.noColor)
+			? "disabled" : "enabled") + ".")
+		rln.rePrompt()
 	}
 }
 
@@ -956,7 +963,7 @@ RELAVANT
 
 program
 	.helpOption(false)
-	.version("3.2.3", "-v, --version")
+	.version("3.2.4", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
