@@ -6,7 +6,8 @@
   "dependencies": {
     "commander": "^7.1.0",
     "execa": "^4.1.0",
-    "fkutil": "3.x"
+    "fkutil": "3.x",
+    "open": "^8.0.2"
   },
   "devDependencies": {
     "eslint": "^7.10.0"

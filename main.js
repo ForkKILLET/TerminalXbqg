@@ -4,6 +4,7 @@
 
 const fs			= require("fs")
 const execa			= require("execa")
+const open			= require("open")
 const readline		= require("readline")
 const { Command }	= require("commander")
 const {
@@ -75,13 +76,14 @@ const info = {
 	fetch_prev:			[ [ "[",	"fp"	], [ "Fetch the `prev`ious page." ] ],
 	fetch_curr:			[ [ "=",	"fc"	], [ "Fetch the `curr`ent page." ] ],
 	fetch_next:			[ [ "]",	"n"		], [ "Fetch the `next` page." ] ],
-	around:				[ [ "-",	"a"		], [ "Show `arround` information,",
+	around:				[ [ "-",	"a"		], [ "Show `around` information,",
 												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
 	book_show:			[ [ "@-",	"bs"	], [ "Show your `bookcase`." ] ],
 	book_mark:			[ [ "@+",	"bm"	], [ "Add the current page to your `bookcase` and give it a `name`.",
 												 "Update when the book `name` already exists." ] ],
 	book_fetch:			[ [ "@:",	"bf"	], [ "Fetch the page you read before of a named book in your `bookcase`.",
 												 "Prefix matching is OK." ] ],
+	book_browse:		[ [ "@@",	"bb"	], [ "Open the current page in your browser" ] ],
 	config:				[ [ "%",	"c"		], [ "Print the whole configuration when no arguments is given.",
 												 "Print a specific item by the given `JSON path`.",
 												 "e.g. `xbqg c a.b[42].c`",
@@ -351,7 +353,7 @@ const fun = {
 		let s = c.setting.source.active
 		if (a[s]) ;
 		else if (c.setting.source.autoSwitching) {
-			c.setting.source.active = s = Object.keys(a)[0]
+			c.setting.souzarce.active = s = Object.keys(a)[0]
 			Log(`Auto switching source to \`${s}\`.`)
 			await c.write("setting")
 		}
@@ -362,6 +364,20 @@ const fun = {
 		}
 		Log(`Fetching book \`${name}\`.`)
 		await fun.fetch(a[s].curr)
+	},
+
+	book_browse: async() => {
+		Div("book browse", 0, 2)
+
+		await c.read("around")
+		const s = c.setting.source.active, src = c.setting.source.list[s]
+		const browser = c.setting.browser
+		const url = exT(src.url, { page: c.around[s].curr })
+		Log("Running " + Hili(`${browser ?? "browser"} ${url}`))
+		open(url, { app: { name: browser } })
+
+		Log("Done.")
+		Div("EOF", 1, 1)
 	},
 
 	config: async(_path, _action, _val) => {
@@ -602,6 +618,7 @@ const fun_i = {
 const c_dft = {
 	setting: {
 	  editor: "vi ${path}",
+      browser: null,
 	  interactive: {
 	    prompt: "!{ hili | xbqg$ } ",
         forceClearCommand: "clear"
@@ -939,7 +956,7 @@ RELAVANT
 
 program
 	.helpOption(false)
-	.version("3.2.1", "-v, --version")
+	.version("3.2.3", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)

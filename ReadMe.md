@@ -25,7 +25,7 @@ $ export XBQG_DATA="/path/to/..." # important!
 ## FAQ
 
 1.	**Q:** Why is the help EMPTY?  
-	**A:** I don't know. if you find it out, please contact me.
+	**A:** ~~I don't know. if you find it out, please contact me.~~ We eventually have a help.
 2.	**Q:** Why does the script crash after updating?  
 	**A:** ~~Also update the npm package `fkutil`. If this doesn't work, submit an issue.~~  You no longer need to update dependences now.
 3.	**Q:** The text contains weird characters.  
