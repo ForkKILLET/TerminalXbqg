@@ -109,6 +109,7 @@ const info_i = {
 	exit:		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
 	clear:		[ [ "-",	"c" ], [ "Clear the console." ] ],
 	eval:		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
+	shell:		[ [ "^",	"s"	], [ "Run command in shell." ] ],
 	color:		[ [ "%",	"n"	], [ "Toggle color." ] ],
 	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
@@ -605,14 +606,22 @@ const fun_i = {
 			await execa.command(c.setting.interactive.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
-	eval: (code) => {
+	eval: (code_) => {
 		Div("evaluate", 0, 1)
 		try {
-			Log(eval(code))
+			Log(eval(code_.join(" ")))
 		}
 		catch (e) {
 			Warn(e)
 		}
+		Div("EOF", 0, 1)
+	},
+	shell: async(code_) => {
+		Div("shell", 0, 1)
+		try {
+			await execa.command(code_.join(" "), std)
+		}
+		catch {}
 		Div("EOF", 0, 1)
 	},
 	color: () => {
@@ -810,7 +819,26 @@ const c_dft = {
       history: {
         on: true,
         loadToInteractive: 10
-      }
+      },
+      hooks: [
+        {
+          on: true,
+          trigger: [ "post", "fetch" ],
+          action: {
+            cmd: "pagewarner",
+            arg: [ true ]
+          }
+        },
+        {
+          on: false,
+          interactive: true,
+          trigger: [ "pre", "fetch" ],
+          action: {
+            cmd: "!clear",
+            arg: "!"
+          }
+        }
+      ]
 	},
 	history: [ "help" ],
 	around: {},
@@ -918,14 +946,16 @@ const init_program = ({ p, i, f, h, u }) => {
 				}
 			}
 		})
-		
+
 		p
 			.command(n + (i[n][2]
-				? i[n][2].split(", ").filter(p => p[0] !== "$")		// Note: Private parameter.
-					.map(p => (p[0] === "_"
-						? ` [${p.slice(1)}]`						// Note: Optional parameter.
-						: ` <${p}>`									// Note: Necessary parameter.
-					)).join(" ")
+				? " " + i[n][2].split(", ").filter(p => p && p[0] !== "$").map(p => {
+					const
+						variadic = p[p.length - 1] === "_",
+						optional = p[0] === "_"
+					p = p.replace(/^_|_$/g, "") + (variadic ? "..." : "")
+					return optional ? `[${p}]` : `<${p}>`
+				}).join(" ")
 				: ""
 			))
 			.aliases(i[n][0])
@@ -963,7 +993,7 @@ RELAVANT
 
 program
 	.helpOption(false)
-	.version("3.2.4", "-v, --version")
+	.version("3.2.5", "-v, --version")
 	.option("-n, --no-color", "disable colored output")
 	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
 	.parse(process.argv)
