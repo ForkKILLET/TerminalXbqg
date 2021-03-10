@@ -561,6 +561,8 @@ const fun = {
 			}
 			flag.help = true
 
+			if (c.setting.interactive.allowXbqgPrefix) cmd = cmd.replace(/^xbqg /, "")
+
 			let p = program, s = cmd
 			if (s[0] === "!") {
 				s = s.slice(1)
@@ -637,7 +639,8 @@ const c_dft = {
       browser: null,
 	  interactive: {
 	    prompt: "!{ hili | xbqg$ } ",
-        forceClearCommand: "clear"
+        forceClearCommand: "clear",
+        allowXbqgPrefix: true
 	  },
 	  pagewarner: {
 	    warnNum: 50,
