@@ -4,9 +4,8 @@
   "description": "",
   "main": "main.js",
   "dependencies": {
-    "commander": "^7.1.0",
     "execa": "^4.1.0",
-    "fkutil": "3.x",
+    "fkutil": "3.0.5",
     "open": "^8.0.2"
   },
   "devDependencies": {
