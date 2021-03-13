@@ -2,49 +2,49 @@
 
 // :: Dep
 
+const version		= "4.0.0"
+
 const fs			= require("fs")
 const execa			= require("execa")
 const open			= require("open")
 const readline		= require("readline")
-const { Command }	= require("commander")
 const {
 	Is, Cc, ski,
 	sleep, ajax, exTemplate: exT, serialize,
 	Logger
 }					= require("fkutil")
 
-const logger = Logger().bind(), {
-	warn: Warn, errEOF: Err, log: Log,
-	exTemplateLog: exTLog, hili: Hili, div: Div
+const logger		= Logger().bind(), {
+	warn: Warn, errEOF: Err, log: Log, div: Div,
+	exTemplateLog: exTLog, hili: Hili, bold: Bold, table: Table
 } = logger
-const program = new Command("global"), program_i = new Command("interactive")
-const std = {
+const std			= {
 	stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
 }
 
 // :: Tool
 
-const existFile = p => new Promise(resolve =>
-	fs.exists(p, exist => resolve(exist))
+const existFile = p => new Promise(res =>
+	fs.exists(p, exist => res(exist))
 )
-const readJSON = (p, noParse) => new Promise((resolve, reject) =>
+const readJSON = (p, noParse) => new Promise((res, rej) =>
 	fs.readFile(p, "utf8", (err, data) => err
-		? reject(err)
-		: resolve(noParse
+		? rej(err)
+		: res(noParse
 			? data.toString()
 			: JSON.parse(data.toString())
 		)
 	)
 )
-const writeJSON = (p, data) => new Promise((resolve, reject) =>
+const writeJSON = (p, data) => new Promise((res, rej) =>
 	fs.writeFile(p, new Uint8Array(
 		Buffer.from(Is.str(data)
 			? data
 			: serialize(data, { regexp: true, indent: 2 })
 		)
 	), "utf8", err => err
-		? reject(err)
-		: resolve()
+		? rej(err)
+		: res()
 	)
 )
 
@@ -61,30 +61,30 @@ const c = {
 		await writeJSON(`${p_data}/${n}.json`, c[n])
 	}
 }
-const today = new Date().format("yyyymmdd")
-const flag = {
-	pre: false,
-	interactive: false,
-	help: true
-}
-let options, p_data, rln
 
-const info = {
-	fetch:				[ [ ":",	"f"		], [ "Fetch a page by specific `page` id." ] ],
-	source:				[ [ ":=",	"s"		], [ "Modify the active `source`. Prefix matching is OK.",
+const flag = {
+	lauch: true,
+	interactive: false,
+}
+let p_data, rln
+
+const info = {}
+info.g = {
+	fetch:				[ [ "f",	":"		], [ "Fetch a page by specific `page` id." ] ],
+	source:				[ [ "s",	":="	], [ "Modify the active `source`. Prefix matching is OK.",
 												 "Show the active `source` when no argument is given." ] ],
-	fetch_prev:			[ [ "[",	"fp"	], [ "Fetch the `prev`ious page." ] ],
-	fetch_curr:			[ [ "=",	"fc"	], [ "Fetch the `curr`ent page." ] ],
-	fetch_next:			[ [ "]",	"n"		], [ "Fetch the `next` page." ] ],
-	around:				[ [ "-",	"a"		], [ "Show `around` information,",
+	fetch_prev:			[ [ "fp",	"["		], [ "Fetch the `prev`ious page." ] ],
+	fetch_curr:			[ [ "fc",	"="		], [ "Fetch the `curr`ent page." ] ],
+	fetch_next:			[ [ "n",	"]"		], [ "Fetch the `next` page." ] ],
+	around:				[ [ "a",	"-"		], [ "Show `around` information,",
 												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
-	book_show:			[ [ "@-",	"bs"	], [ "Show your `bookcase`." ] ],
-	book_mark:			[ [ "@+",	"bm"	], [ "Add the current page to your `bookcase` and give it a `name`.",
+	book_show:			[ [ "bs",	"@-"	], [ "Show your `bookcase`." ] ],
+	book_mark:			[ [ "bm",	"@+"	], [ "Add the current page to your `bookcase` and give it a `name`.",
 												 "Update when the book `name` already exists." ] ],
-	book_fetch:			[ [ "@:",	"bf"	], [ "Fetch the page you read before of a named book in your `bookcase`.",
+	book_fetch:			[ [ "bf",	"@:"	], [ "Fetch the page you read before of a named book in your `bookcase`.",
 												 "Prefix matching is OK." ] ],
-	book_browse:		[ [ "@@",	"bb"	], [ "Open the current page in your browser" ] ],
-	config:				[ [ "%",	"c"		], [ "Print the whole configuration when no arguments is given.",
+	book_browse:		[ [ "bb",	"@@"	], [ "Open the current page in your browser" ] ],
+	config:				[ [ "c",	"%"		], [ "Print the whole configuration when no arguments is given.",
 												 "Print a specific item by the given `JSON path`.",
 												 "e.g. `xbqg c a.b[42].c`",
 												 "Delete the specific item.",
@@ -92,20 +92,19 @@ const info = {
 												 "Modify the specific item. Argument `=` turns the `value` into a string.",
 												 "e.g. `xbqg c a.boolean true` and",
 												 "     `xbqg c a.string = true` or `xbqg c a.string \\\"true\\\"`" ] ],
-	config_edit:		[ [ "%+",	"ce"	], [ "Edit a configuration JSON file by your %`editor`.",
+	config_edit:		[ [ "ce",	"%+"	], [ "Edit a configuration JSON file by your %`editor`.",
 												 "In default, `setting.json`." ] ],
-	config_reset:		[ [ "%=",	"cr"	], [ "Reset your configuration to the default in 5 seconds.",
+	config_reset:		[ [ "cr",	"%="	], [ "Reset your configuration to the default in 5 seconds.",
 												 "The task is immediately done when `now` is given." ] ],
-	pagewarner_stat:	[ [ "^-",	"ps"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
-	pagewarner_diff:	[ [ "^=",	"pd"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
-	interactive:		[ [ "!",	"i"		], [ "Enter the `interactive` mode." ] ],
-	history:			[ [ "~",	"hi"	], [ "Show history." ] ],
-	history_reset:		[ [ "~=",	"hr"	], [ "Reset history." ] ],
-	help:				[ [ "?",	"h"		], [ "Show help of the given `theme` or `command name`.",
+	pagewarner_stat:	[ [ "ps",	"^-"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
+	pagewarner_diff:	[ [ "pd",	"^="	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
+	interactive:		[ [ "i",	"!"		], [ "Enter the `interactive` mode." ] ],
+	history:			[ [ "hi",	"~"		], [ "Show history." ] ],
+	history_reset:		[ [ "hr",	"~="	], [ "Reset history." ] ],
+	help:				[ [ "h",	"?"		], [ "Show help of the given `theme` or `command name`.",
 												 "Show usage when no arguments is given."] ],
 }
-
-const info_i = {
+info.i = {
 	exit:		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
 	clear:		[ [ "-",	"c" ], [ "Clear the console." ] ],
 	eval:		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
@@ -113,8 +112,7 @@ const info_i = {
 	color:		[ [ "%",	"n"	], [ "Toggle color." ] ],
 	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
-
-const info_t = {
+info.t = {
 	data: `
 All data files exists in \`$XBQG_DATA\` unless user gives a \`--path\` option to override it.
 Filenames cannot be changed at present.
@@ -183,6 +181,7 @@ RELAVANT
 `
 }
 
+const cmd = {}
 const fetch_alias = name => async() => {
 	Div("page info", 0, 1)
 
@@ -191,20 +190,27 @@ const fetch_alias = name => async() => {
 
 	if (page) {
 		await c.read("pagewarner")
+		const today = new Date().format("yyyymmdd")
 		if (Is.udf(c.pagewarner[today])) c.pagewarner[today] = 0
 		else c.pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
 		await c.write("pagewarner")
 
 		Log(`${name}: ${page}`)
-		await fun.fetch(page)
+		await cmd.g.fetch(page)
 	}
 	else {
 		Log(`${name}: null`)
 		Div("EOF", 0, 1)
 	}
 }
-
-const fun = {
+const history_save = async(raw) => {
+	if (c.setting.history.on) {
+		await c.read("history")
+		c.history.push(raw.join(" "))
+		await c.write("history")
+	}
+}
+cmd.g = {
 	fetch: async(page) => {
 		Div("fetch", 0, 2)
 		if (! page) Err("Page can't be null.")
@@ -231,7 +237,7 @@ const fun = {
 				)
 			}
 			else if (e.when === "RequestGet" && e.err.code === 'ENOTFOUND')
-				Err("Network went wrong. Please check your Wi-fi.")
+				Err("Netcmd.g went wrong. Please check your Wi-fi.")
 		}
 
 		for (let i in matcher) {
@@ -267,7 +273,7 @@ const fun = {
 
 		await c.write("around")
 
-		await fun.pagewarner_stat(true)
+		await cmd.g.pagewarner_stat(true)
 
 		Div("EOF", 1, 1)
 	},
@@ -353,9 +359,8 @@ const fun = {
 		name = Object.keys(c.books).find(n => n.startWith(name))
 		const a = c.books[name]
 		let s = c.setting.source.active
-		if (a[s]) ;
-		else if (c.setting.source.autoSwitching) {
-			c.setting.souzarce.active = s = Object.keys(a)[0]
+		if (a?.[s] && c.setting.source.autoSwitching) {
+			c.setting.source.active = s = Object.keys(a)[0]
 			Log(`Auto switching source to \`${s}\`.`)
 			await c.write("setting")
 		}
@@ -365,7 +370,7 @@ const fun = {
 			return
 		}
 		Log(`Fetching book \`${name}\`.`)
-		await fun.fetch(a[s].curr)
+		await cmd.g.fetch(a[s].curr)
 	},
 
 	book_browse: async() => {
@@ -468,6 +473,7 @@ const fun = {
 	pagewarner_stat: async($after_fetching) => {
 		await c.read("pagewarner")
 
+		const today = new Date().format("yyyymmdd")
 		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner.warnNum
 
 		Div("pagewarner stat", 0, 2)
@@ -528,15 +534,8 @@ const fun = {
 			return
 		}
 
-		init_program({
-			p: program_i, i: info_i, f: fun_i,
-			h: "Interactive instruction starts with a bang \`!\`.",
-			u: () =>
-				Warn("Unknown interactive instruction. Use `!help`, `!h` or `!?` to get usage.")
-		})
-
 		Div("interactive", 0, 2)
-		Log("Use `!help`, `!h` or `!?` to get interactive instruction usage.")
+		Log("Use `!help` to get usage of interactive instructions.")
 		
 		flag.interactive = true
 		rln = readline.createInterface({
@@ -554,27 +553,15 @@ const fun = {
 
 		rln.rePrompt()
 		rln.prompt()
-		rln.on("line", async(cmd) => {
-			if (! cmd.trim()) {
+		rln.on("line", async(ln) => {
+			if (! (ln = ln.trim())) {
 				rln.prompt()
 				return
 			}
-			flag.help = true
 
-			if (c.setting.interactive.allowXbqgPrefix) cmd = cmd.replace(/^xbqg /, "")
+			if (c.setting.interactive.allowXbqgPrefix) ln = ln.replace(/^xbqg /, "")
 
-			let p = program, s = cmd
-			if (s[0] === "!") {
-				s = s.slice(1)
-				p = program_i
-			}
-
-			await p.parseAsync(s.split(" "), { from: "user" })
-			
-			if (c.setting.history.on) {
-				c.history.push(cmd)
-				await c.write("history")
-			}
+			await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
 
 			rln.prompt()
 		})
@@ -597,8 +584,7 @@ const fun = {
 		Div("EOF", 1, 1)
 	}
 }
-
-const fun_i = {
+cmd.i = {
 	exit: () => {
 		rln.close()
 		process.exit(0)
@@ -631,6 +617,13 @@ const fun_i = {
 			? "disabled" : "enabled") + ".")
 		rln.rePrompt()
 	}
+}
+
+const opt = {}
+opt.g = {
+	version:	[ "v"	, [ "null"					],	"show version" ],
+	plain:		[ "n"	, [ "boolean"				],	"disable colored output" ],
+	path:		[ "p"	, [ "string",	"p_data"	],	"assign data path, override `$XBQG_DATA`." ]
 }
 
 const c_dft = {
@@ -698,7 +691,7 @@ const c_dft = {
 	          around: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /=keypage;([^]*?)function keypage/
+	            regexp: /=keypage;([^]*?)cmdction keypage/
 	          },
 	          prev: {
 	            necessary: false,
@@ -849,136 +842,184 @@ const c_dft = {
 	pagewarner: {}
 }
 
+// :: Wargs
+
+const wargs = (name) => ({
+	init({ has_option, wrong_usage }) {
+		this.cmd = cmd[name]
+		this.wrong_usage = wrong_usage
+		this.info = info[name]
+		if (this.has_option = has_option)
+			this.opt = opt[name]
+
+		this._init_cmd(Object.keys(this.cmd))
+
+		return this
+	},
+	_init_cmd(cmds) {
+		for (let n of cmds) {
+			this.info[n].push(
+				this.cmd[n].toString().match(/^(async)?\((.*)\)/)?.[2]?.split(", ")
+			)
+			this.cmd[n] = new Proxy(this.cmd[n], {
+				apply: async(f, _, $) => {
+					await this.trigger([ "pre-" + n, "pre*" ], _, n)
+					await f(...$)
+					await this.trigger([ "post-" + n, "post*" ], _, n)
+				}
+			})
+		}
+	},
+	_find_cmd(n) {
+		return n && Object.entries(this.info).find(e => [ e[0], ...e[1][0] ].includes(n))
+	},
+	_find_opt(n) {
+		return n && Object.entries(this.opt).find(e => [ e[0], e[1][0] ].includes(n))
+	},
+	help({ themes, extra } = {}) {
+		this.cmd.help = async(_theme) => {
+			Div("help", 0, 2)
+
+			let ext, txt = ""
+			const cmd_head = (k, v) => [
+				[ k, ...v[0] ].map(Hili).join(" | "),
+				v[2].filter(o => o && o[0] !== "$").map(o => {
+					const n = o.replace(/_$/, "...")
+					return n[0] === "_"
+						? "[" + Hili(n.slice(1)) + "]"
+						: "<" + Hili(n) + ">"
+				}).join(" ")
+			]
+
+			if (! _theme) {
+				if (this.has_option) txt = "OPTIONS\n\n"
+					+ Table(Object.entries(this.opt).map(([ k, v ]) => [
+						"--" + Hili(k) + " | -" + Hili(v[0]),
+						v[2]
+					]), [ 25 ])
+				txt	+= "\n\nCOMMANDS\n\n"
+					+ Table(
+						Object.entries(this.info).map(([ k, v ]) => {
+							const tab = [ cmd_head(k, v) ]
+							for (let i in v[1]) {
+								if (! tab[i]) tab[i] = [ "", "" ]
+								tab[i][2] = v[1][i]
+							}
+							return tab
+						}).flat(), [ 30, 25 ]
+					)
+					+ (extra ? "\n\n" + extra.trim() : "")
+			}
+			else if (ext = themes[_theme]) {
+				txt = _theme.toUpperCase() + "\n\n" + ext.trim()
+			}
+			else {
+				let e = this._find_cmd(_theme)
+				if (e) txt = "COMMAND\n\n" + cmd_head(...e).join(" ") + "\n" + e[1][1].join("\n")
+				else Warn("Unknown command or theme.")
+			}
+
+			Log(txt.replace(/(^|\n)[A-Z]+\n/g, Bold))
+			Div("EOF", 1, 1)
+			
+			if (! flag.interactive) process.exit(0)
+		}
+		this._init_cmd([ "help" ])
+
+		return this
+	},
+	_hook: {},
+	trigger(event, ...A) {
+		return Promise.all((Is.arr(event) ? event : [ event ]).map(e => new Promise(res =>
+			setTimeout(async() => res(await this._hook[e]?.(this, ...A)), 0)
+		)))
+	},
+	hook(event, cb) {
+		this._hook[event] = cb
+		return this
+	},
+	_wrong(sit, ...A) {
+		const s = this.wrong_usage[sit](...A)
+		if (flag.interactive) Warn(s)
+		else {
+			Div("wrong usage", 0, 2)
+			Err(s)
+		}
+		return this
+	},
+	async parse(raw) {
+		if (! raw?.length) raw = process.argv.slice(2)
+
+		this.o = {}
+		let mod = this.opt ? "opt" : "cmd",
+			opt_n, opt_t, opt_m, cmd_n, arg_i, arg_res, arg = []
+		for (let i = 0; i < raw.length; i++) {
+			let tk = raw[i]
+			switch (mod) {
+			case "opt":
+				const n = tk.match(/^-{1,2}([^-]+)/)?.[1], o = this._find_opt(n)
+				if (! o) {
+					if (tk !== "--") i --
+					mod = "cmd"
+					continue
+				}
+
+				[ opt_n, [ , [ opt_t, opt_m ] ] ] = o
+				if ([ "null", "boolean" ].includes(opt_t)) this.o[opt_n] = true
+				else mod = "opt_arg"
+				break
+			case "opt_arg":
+				switch (opt_t) {
+				case "string":
+					break
+				case "number":
+					tk = + tk
+					break
+				}
+				this.o[opt_m ?? opt_n] = tk
+				mod = "opt"
+				break
+			case "cmd":
+				const c = this._find_cmd(tk)
+				if (! c) return this._wrong("unknown_cmd", tk);
+				[ cmd_n ] = c
+				arg_i = this.info[cmd_n][2]
+				mod = "cmd_arg"
+				break
+			case "cmd_arg":
+				const arg_i_now = arg_i[arg.length]
+				if (Is.udf(arg_res)) {
+					if (! arg_i_now) return this._wrong("too_many_args", cmd_n)
+					if (arg_i_now.endsWith("_")) arg_res = arg.length
+				}
+				arg.push(tk)
+				break
+			}
+		}
+
+		if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
+		cmd_n ??= "help"
+		await this.trigger("run", cmd_n, raw)
+		await this.cmd[cmd_n]?.(...arg)
+
+		return this
+	}
+})
+
 // :: Init
 
-const pre = async(pass) => {
-	flag.pre = true
+const cli = {}
 
-	options = program.opts()
-	if (! options.color) logger.opt.noColor = true
-
-	if (pass) return
-
-	if (! (
-		p_data = options.path ?? process.env.XBQG_DATA?.replace(/\/$/, "")
-	)) {
-		Div("pre", 0, 2)
-		Err(
-			"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
-			"Or use `xbqg -p <p_data>` to assign it."
-		)
-	}
-
-	for (let fn in c_dft)
-		if (! await existFile(`${p_data}/${fn}.json`))
-			await c.write(fn, c_dft[fn])
-	await c.read("setting")
-}
-
-const init_program = ({ p, i, f, h, u }) => {
-	f.help = async(_theme) => {
-		if (! flag.help) return
-		flag.help = false
-
-		Div("help", 0, 2)
-
-		let noPadding = false, extra
-
-		const
-			len = s => s.replace(/\x1B\[.+?m/g, "").length,
-			pad = x =>  " ".repeat(noPadding === true ? 1 : x),
-			
-			opt = o => {
-				const value = o.flags.split(", ").map(f => f.replace(/[^-<>]/g, s => Hili(s))).join(" | ")
-				return "\n" +
-					value + " ".repeat(25 - len(value)) +
-					o.description
-			},
-			cmd = c => {
-				const
-					argument = c._args.map(arg => {
-						const n = Hili(arg.name + (arg.variadic ? "..." : ""))
-						return arg.required ? "<" + n + ">" : "[" + n + "]"
-					}).join(" ") || "-",
-					alias = Hili(c._name) +
-						(c._aliases.map(a => " | " + Hili(a)).join(""))
-				return "\n" +
-					alias + pad(30 - len(alias)) +
-					argument + pad(25 - len(argument)) + (
-					noPadding
-						? "\n" + c.description()
-						: c.description().replace(/\n/g, "\n" + pad(55))
-					)
-			}
-
-		if (! _theme || _theme.error) Log(
-			(p === program ? "OPTIONS\n" + p.options.map(opt).join("") + "\n\n" : "") +
-			"COMMANDS\n" + p.commands.map(cmd).join("") +
-			"\n" + h.replace(/<(.+?)>/g, (_, s) => "<" + Hili(s) + ">")
-		)
-		else if (extra = info_t[_theme]) {
-			Log(_theme.toUpperCase() + "\n" + extra)
-		}
-		else {
-			let id
-			Object.entries(i).forEach((v, k) => {
-				const i = [ v[0], ...v[1][0] ].indexOf(_theme)
-				if (i >= 0) id = k
-			})
-			noPadding = true
-			if (Is.num(id)) Log("COMMAND\n" + cmd(p.commands[id]))
-			else Warn("Unknown command or theme.")
-		}
-		Div("EOF", 1, 1)
-		
-		if (! flag.interactive) process.exit(0)
-	}
-
-	for (let n in i) {
-		i[n].push(f[n].toString().match(/^(async)?\((.*)\)/)?.[2])
-
-		f[n] = new Proxy(f[n], {
-			apply: async(f, _, $) => {
-				if (! flag.pre)
-					await pre(n === "help")
-				await f(...$)
-				if (c.setting.history.on && ! flag.interactive) {
-					await c.read("history")
-					c.history.push(process.argv.slice(2).join(" "))
-					await c.write("history")
-				}
+const init_cli = async() => {
+	cli.g = await wargs("g")
+		.init({
+			has_option: true,
+			wrong_usage: {
+				unknown_cmd: cmd => `Unknown command \`${cmd}\`. Use \`help\` to get usage.`,
+				too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`help ${cmd}\` to get usage.`
 			}
 		})
-
-		p
-			.command(n + (i[n][2]
-				? " " + i[n][2].split(", ").filter(p => p && p[0] !== "$").map(p => {
-					const
-						variadic = p[p.length - 1] === "_",
-						optional = p[0] === "_"
-					p = p.replace(/^_|_$/g, "") + (variadic ? "..." : "")
-					return optional ? `[${p}]` : `<${p}>`
-				}).join(" ")
-				: ""
-			))
-			.aliases(i[n][0])
-			.description(i[n][1].join("\n"))
-			.action(f[n])
-			.helpOption(false)
-	}
-
-	p.help = f.help // Hack: Kill original help.
-
-	p._unknownCommand = program.unknownCommand
-	p.unknownCommand = () => {
-		if (flag.interactive) u()
-		else p._unknownCommand()
-	}
-}
-
-init_program({
-	p: program, i: info, f: fun,
-	h: `
+		.help({ themes: info.t, extra: `
 CONTACT
 
 GitHub Issue         <https://github.com/ForkFG/TerminalXbqg/issues>
@@ -990,14 +1031,47 @@ RELAVANT
 !?                   -> interactive instructions
 ?data                -> data files
 ?setting             -> the configuration
-`,
-	u: () => Warn("Unknown command. Use `help`, `h` or `?` to get usage.")
-})
+`		})
+		.hook("run", async (C, cmd, raw) => {
+			if (C.o.version) {
+				Log("xbqg " + version)
+				process.exit(0)
+			}
 
-program
-	.helpOption(false)
-	.version("3.2.5", "-v, --version")
-	.option("-n, --no-color", "disable colored output")
-	.option("-p, --path <p_data>", "assign data path, override `$XBQG_DATA`.")
-	.parse(process.argv)
+			if (flag.lauch) {
+				flag.lauch = false
+				if (C.o.plain) logger.opt.noColor = true
+				if (cmd === "help") return
+				
+				if (! (
+					p_data = C.p_data ?? process.env.XBQG_DATA?.replace(/\/$/, "")
+				)) {
+					Div("lauch", 0, 2)
+					Err(
+						"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
+						"Or use `xbqg --path <p_data>` to assign it."
+					)
+				}
+
+				for (let fn in c_dft)
+					if (! await existFile(`${p_data}/${fn}.json`))
+						await c.write(fn, c_dft[fn])
+				await c.read("setting")
+			}
+
+			history_save(raw)
+		})
+		.parse()
+	cli.i = wargs("i")
+		.init({
+			wrong_usage: {
+				unknown_cmd: cmd => `Unknown instruction \`${cmd}\`. Use \`! help\` to get usage.`,
+				too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`! help ${cmd}\` to get usage.`
+			}
+		})
+		.help({ extra: "Interactive instruction starts with a bang \`!\`." })
+		.hook("run", (_, __, raw) => history_save([ "!", ...raw ]))
+}
+
+init_cli()
 

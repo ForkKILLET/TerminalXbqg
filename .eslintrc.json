@@ -17,6 +17,7 @@
 		"no-control-regex": 0,
 		"no-constant-condition": 0,
 		"no-unused-vars": 1,
-		"no-cond-assign": 0
+		"no-cond-assign": 0,
+		"no-case-declarations": 0
     }
 }
