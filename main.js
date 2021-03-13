@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.0.0"
+const version		= "4.0.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -359,7 +359,8 @@ cmd.g = {
 		name = Object.keys(c.books).find(n => n.startWith(name))
 		const a = c.books[name]
 		let s = c.setting.source.active
-		if (a?.[s] && c.setting.source.autoSwitching) {
+		if (a?.[s]) ;
+		else if (c.setting.source.autoSwitching) {
 			c.setting.source.active = s = Object.keys(a)[0]
 			Log(`Auto switching source to \`${s}\`.`)
 			await c.write("setting")
