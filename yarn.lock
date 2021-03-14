@@ -378,10 +378,10 @@ file-entry-cache@^6.0.1:
   dependencies:
     flat-cache "^3.0.4"
 
-fkutil@3.0.5:
-  version "3.0.5"
-  resolved "https://registry.npm.taobao.org/fkutil/download/fkutil-3.0.5.tgz?cache=0&sync_timestamp=1615644516476&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2Ffkutil%2Fdownload%2Ffkutil-3.0.5.tgz#a97c5fa465f440e780df7fab66f5c5c903bad69f"
-  integrity sha1-qXxfpGX0QOeA33+rZvXFyQO61p8=
+fkutil@3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/fkutil/-/fkutil-3.1.0.tgz#0a18cefeda5676dfc7df6e59d88d5b6cfed99309"
+  integrity sha512-vvRZuqW1SAKy6ghP6hAa0qgmhyc0KivwGKCBNHTeaXD2JVrd3Bd1VHu6O46WxlN0YuytEfOXzDhnUfViAkgPEQ==
   dependencies:
     bufferhelper "^0.2.1"
     iconv-lite "^0.6.2"

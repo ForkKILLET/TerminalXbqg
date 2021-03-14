@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.1.1"
+const version		= "4.2.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -10,11 +10,11 @@ const open			= require("open")
 const readline		= require("readline")
 const {
 	Is, Cc, ski,
-	sleep, ajax, exTemplate: exT, serialize,
+	sleep, httpx, exTemplate: exT, serialize,
 	Logger
 }					= require("fkutil")
 
-const logger		= Logger().bind(), {
+const logger		= Logger({ noColor: false }).bind(), {
 	warn: Warn, errEOF: Err, log: Log, div: Div,
 	exTemplateLog: exTLog, hili: Hili, bold: Bold, table: Table
 } = logger
@@ -24,29 +24,6 @@ const std			= {
 
 // :: Tool
 
-const existFile = p => new Promise(res =>
-	fs.exists(p, exist => res(exist))
-)
-const readJSON = (p, noParse) => new Promise((res, rej) =>
-	fs.readFile(p, "utf8", (err, data) => err
-		? rej(err)
-		: res(noParse
-			? data.toString()
-			: JSON.parse(data.toString())
-		)
-	)
-)
-const writeJSON = (p, data) => new Promise((res, rej) =>
-	fs.writeFile(p, new Uint8Array(
-		Buffer.from(Is.str(data)
-			? data
-			: serialize(data, { regexp: true, indent: 2 })
-		)
-	), "utf8", err => err
-		? rej(err)
-		: res()
-	)
-)
 const objectPath = (obj, path, create, val) => {	
 	if (! path.match(/^[.[]/)) path = "." + path
 
@@ -87,22 +64,31 @@ const objectPath = (obj, path, create, val) => {
 // :: Logic
 
 const c = {
-	read: async(n, force) => {
+	read: (n, force) => {
 		if (force && c[n]) return c[n]
-		c[n] = await readJSON(`${p_data}/${n}.json`)
+		c[n] = JSON.parse(fs.readFileSync(p_file(n), "utf8").toString())
+		if (flag.debug) Log(Hili("xbqg% ") + `read ${n}`)
 	},
-	read_json: async(n) => await readJSON(`${p_data}/${n}.json`),
-	write: async(n, data) => {
+	read_json: n => fs.readFileSync(p_file(n), "utf8").toString(),
+	write: (n, data) => {
 		if (data) c[n] = data
-		await writeJSON(`${p_data}/${n}.json`, c[n])
+		fs.writeFileSync(p_file(n),
+			new Uint8Array(Buffer.from(Is.str(c[n])
+				? c[n]
+				: serialize(c[n], { regexp: true, indent: 2 })
+			)), "utf8")
+		if (flag.debug) Log(Hili("xbqg% ") + `write ${n}`)
 	}
 }
 
 const flag = {
 	lauch: true,
 	interactive: false,
+	get debug() { return cli.g.o.debug ?? false },
+	get plain() { return cli.g.o.plain ?? false }
 }
 let p_data, rln
+const p_file = n => `${p_data}/${n}.json`
 
 const info = {}
 info.g = {
@@ -146,7 +132,6 @@ info.i = {
 	clear:		[ [ "-",	"c" ], [ "Clear the console." ] ],
 	eval:		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
 	shell:		[ [ "^",	"s"	], [ "Run command in shell." ] ],
-	color:		[ [ "%",	"n"	], [ "Toggle color." ] ],
 	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 info.t = {
@@ -193,7 +178,6 @@ source: object
     list: object
         [source]: object
             url: string
-            charset: string
             matcher: object
                 [matcher]: object
                     necessary: boolean
@@ -222,15 +206,15 @@ const cmd = {}
 const fetch_alias = name => async() => {
 	Div("page info", 0, 1)
 
-	await c.read("around")
+	c.read("around")
 	const page = c.around[c.setting.source.active]?.[name]
 
 	if (page) {
-		await c.read("pagewarner")
+		c.read("pagewarner")
 		const today = new Date().format("yyyymmdd")
 		if (Is.udf(c.pagewarner[today])) c.pagewarner[today] = 0
 		else c.pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
-		await c.write("pagewarner")
+		c.write("pagewarner")
 
 		Log(`${name}: ${page}`)
 		await cmd.g.fetch(page)
@@ -240,11 +224,11 @@ const fetch_alias = name => async() => {
 		Div("EOF", 0, 1)
 	}
 }
-const history_save = async(raw) => {
+const history_save = ln => {
 	if (c.setting.history.on) {
-		await c.read("history")
-		c.history.push(raw.join(" "))
-		await c.write("history")
+		c.read("history")
+		c.history.push(ln)
+		c.write("history")
 	}
 }
 
@@ -260,22 +244,20 @@ cmd.g = {
 		const blocks = {}
 
 		try {
-			blocks.html = await ajax(exT(src.url, { page }), src.charset)
+			blocks.html = await httpx.get(exT(src.url, { page }),
+				{ headers: { "User-Agent": "xbqg/" + version } }
+			)
 		}
-		catch (e) {
-			if (e.user) {
-				if (e.type === "UnexpectResCode") Err(
-					`Got an exception response code ${e.statusCode}.` + ski(
-					e.statusCode, {
-						404: " Perhaps the given page is wrong.",
-						502: " Perhaps the server go wrong. You may switch the source.",
-						503: " Perhaps the server is busy. You may wait and retry later.",
-						504: ski.q(503)
-					}, "")
-				)
-			}
-			else if (e.when === "RequestGet" && e.err.code === 'ENOTFOUND')
-				Err("Netcmd.g went wrong. Please check your Wi-fi.")
+		catch (err) {
+			if (Is.num(err)) Log("Unexpected response code " + err + "." + ski(
+				err, {
+					404: " Perhaps the given page is wrong.",
+					502: " Perhaps the server go wrong. You may switch the source.",
+					503: " Perhaps the server is busy. You may wait and retry later.",
+					504: ski.q(503)
+				}, "")
+			)
+			else Err(err?.message ?? err)
 		}
 
 		for (let i in matcher) {
@@ -304,12 +286,12 @@ cmd.g = {
 		}
 		Log(JSON.stringify(a, null, 2))
 
-		await c.read("around")
+		c.read("around")
 		a.title = chapterTitle
 		a.time = + new Date()
 		c.around[s] = a
 
-		await c.write("around")
+		c.write("around")
 
 		Div("EOF", 1, 1)
 	},
@@ -318,16 +300,16 @@ cmd.g = {
 	fetch_curr: fetch_alias("curr"),
 	fetch_next: fetch_alias("next"),
 
-	around: async() => {
+	around: () => {
 		Div("around", 0, 2)
 
-		await c.read("around")
+		c.read("around")
 		Log(serialize(c.around[c.setting.source.active], { indent: 2 }))
 
 		Div("EOF", 1, 1)
 	},
 	
-	source: async(_src) => {
+	source: (_src) => {
 		if (_src) {
 			Div("source switch", 0, 1)
 
@@ -336,7 +318,7 @@ cmd.g = {
 			if (_src) {
 				c.setting.source.active = _src
 
-				await c.write("setting")
+				c.write("setting")
 				Log(`Switching source to \`${_src}\`.`)
 			}
 			else Warn("Not found.")
@@ -350,18 +332,18 @@ cmd.g = {
 		}
 	},
 
-	book_show: async() => {
+	book_show: () => {
 		Div("book show", 0, 2)
 		// TODO: better display
-		Log(await c.read_json("books"))
+		Log(c.read_json("books"))
 		Div("EOF", 1, 1)
 	},
 
-	book_mark: async(_name) => {
+	book_mark: (_name) => {
 		Div("book mark", 0, 2)
 
-		await c.read("around")
-		await c.read("books")
+		c.read("around")
+		c.read("books")
 
 		const s = c.setting.source.active
 		const re = RegExp(c.setting.source.list[s].matchKeyInAround)
@@ -381,7 +363,7 @@ cmd.g = {
 		if (! c.books[_name]) c.books[_name] = {}
 		c.books[_name][s] = c.around[s]
 
-		await c.write("books", c.books)
+		c.write("books", c.books)
 		Log(newBook ? "Added." : "Updated.")
 		Div("EOF", 1, 1)
 	},
@@ -390,7 +372,7 @@ cmd.g = {
 		Div("book fetch", 0, 1)
 
 		if (! name) Err("Book name can't be null.")
-		await c.read("books")
+		c.read("books")
 
 		name = Object.keys(c.books).find(n => n.startWith(name))
 		const a = c.books[name]
@@ -399,7 +381,7 @@ cmd.g = {
 		else if (c.setting.source.autoSwitching) {
 			c.setting.source.active = s = Object.keys(a)[0]
 			Log(`Auto switching source to \`${s}\`.`)
-			await c.write("setting")
+			c.write("setting")
 		}
 		else {
 			Warn("Not found.")
@@ -410,10 +392,10 @@ cmd.g = {
 		await cmd.g.fetch(a[s].curr)
 	},
 
-	book_browse: async() => {
+	book_browse: () => {
 		Div("book browse", 0, 2)
 
-		await c.read("around")
+		c.read("around")
 		const s = c.setting.source.active, src = c.setting.source.list[s]
 		const browser = c.setting.browser
 		const url = exT(src.url, { page: c.around[s].curr })
@@ -424,7 +406,7 @@ cmd.g = {
 		Div("EOF", 1, 1)
 	},
 
-	config: async(_path, _action, _val_) => {
+	config: (_path, _action, _val_) => {
 		if (! _path) {
 			Div("config read all", 0, 2)
 			Log(serialize(c.setting, { indent: 2 }))
@@ -445,7 +427,7 @@ cmd.g = {
 
 			const r = objectPath(c.setting, _path, create, val)
 
-			await c.write("setting", c.setting)
+			c.write("setting", c.setting)
 			Log(serialize(r, { indent: 2 }))
 
 			Div("EOF", 1, 1)
@@ -487,13 +469,13 @@ cmd.g = {
 			Log("\n" + serialize(r, { indent: 2 }) + "\n")
 		}
 
-		await c.write("setting", c_dft.setting)
+		c.write("setting", c_dft.setting)
 		Log("Done.")
 		Div("EOF", 1, 1)
 	},
 
-	pagewarner_stat: async() => {
-		await c.read("pagewarner")
+	pagewarner_stat: () => {
+		c.read("pagewarner")
 
 		const today = new Date().format("yyyymmdd")
 		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner.warnNum
@@ -525,8 +507,8 @@ cmd.g = {
 		Div("EOF", 1, 1)
 	},
 
-	pagewarner_diff: async() => {
-		c.pagewarner = await c.read("pagewarner")
+	pagewarner_diff: () => {
+		c.pagewarner = c.read("pagewarner")
 
 		Div("pagewarner diff", 0, 2)
 
@@ -569,7 +551,7 @@ cmd.g = {
 		
 		let n = c.setting.history.loadToInteractive
 		if (n) {
-			await c.read("history")
+			c.read("history")
 			rln.history = c.history.slice(- n).reverse()
 		}
 
@@ -590,18 +572,18 @@ cmd.g = {
 		rln.on("close", () => Div("EOI", 2, 1))
 	},
 
-	history: async() => {
+	history: () => {
 		Div("history show", 0, 2)
-		await c.read("history")
+		c.read("history")
 		Log(c.history.join("\n"))
 		Div("EOF", 1, 1)
 	},
 
-	history_reset: async() => {
+	history_reset: () => {
 		Div("history reset", 0, 2)
 
 		Log("Reseting.")
-		await c.write("history", c_dft.history)
+		c.write("history", c_dft.history)
 		Log("Done.")
 		Div("EOF", 1, 1)
 	}
@@ -633,19 +615,15 @@ cmd.i = {
 		}
 		catch {}
 		Div("EOF", 0, 1)
-	},
-	color: () => {
-		Log("Color " + ((logger.opt.noColor = ! logger.opt.noColor)
-			? "disabled" : "enabled") + ".")
-		rln.rePrompt()
 	}
 }
 
 const opt = {}
 opt.g = {
-	version:	[ "v"	, [ "null"					],	"show version" ],
-	plain:		[ "n"	, [ "boolean"				],	"disable colored output" ],
-	path:		[ "p"	, [ "string",	"p_data"	],	"assign data path, override `$XBQG_DATA`." ]
+	version:	[ "v"	, [ "null"					], "show version" ],
+	plain:		[ "n"	, [ "boolean"				], "disable colored output" ],
+	path:		[ "p"	, [ "string",	"p_data"	], "assign data path, override `$XBQG_DATA`." ],
+	debug:		[ "d"	, [ "boolean"				], "enable debugging output" ]
 }
 
 const c_dft = {
@@ -693,7 +671,6 @@ const c_dft = {
 	      },
 	      "xbqg": {
 	        url: "https://www.vbiquge.com/${page}.html",
-	        charset: "utf8",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -730,7 +707,6 @@ const c_dft = {
 	      },
 	      "8wenku": {
 	        url: "http://www.8wenku.com/b/${page}.html",
-	        charset: "gbk",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -762,7 +738,6 @@ const c_dft = {
 	      },
 	      "kenshuge": {
 	        url: "https://m.kenshuge.com/wapbook/${page}.html",
-	        charset: "gbk",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -797,7 +772,6 @@ const c_dft = {
 	      },
 	      "ibiqu": {
 	        url: "http://www.ibiqu.net/book/${page}.htm",
-	        charset: "gbk",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -898,7 +872,7 @@ const wargs = (name) => ({
 		return n && Object.entries(this.opt).find(e => [ e[0], e[1][0] ].includes(n))
 	},
 	help({ themes, extra } = {}) {
-		this.cmd.help = async(_theme) => {
+		this.cmd.help = (_theme) => {
 			Div("help", 0, 2)
 
 			let ext, txt = ""
@@ -916,7 +890,7 @@ const wargs = (name) => ({
 				if (this.has_option) txt = "OPTIONS\n\n"
 					+ Table(Object.entries(this.opt).map(([ k, v ]) => [
 						"--" + Hili(k) + " | -" + Hili(v[0]),
-						v[2]
+						v[2] + (v[1][0] === "boolean" ? ", toggle with a bang `!`." : "")
 					]), [ 25 ])
 				txt	+= "\n\nCOMMANDS\n\n"
 					+ Table(
@@ -968,17 +942,19 @@ const wargs = (name) => ({
 		}
 		return this
 	},
+	o: {},
 	async parse(raw) {
 		if (! raw?.length) raw = process.argv.slice(2)
 
-		this.o = {}
 		let mod = this.opt ? "opt" : "cmd",
 			opt_n, opt_t, opt_m, cmd_n, arg_i, arg_res, arg = []
 		for (let i = 0; i < raw.length; i++) {
 			let tk = raw[i]
 			switch (mod) {
 			case "opt":
-				const n = tk.match(/^-{1,2}([^-]+)/)?.[1], o = this._find_opt(n)
+				const bang = tk.endsWith("!")
+				let n = tk.replace(/!$/, "").match(/^-{1,2}([^-]+)/)?.[1]
+				const o = this._find_opt(n)
 				if (! o) {
 					if (tk !== "--") i --
 					mod = "cmd"
@@ -986,7 +962,10 @@ const wargs = (name) => ({
 				}
 
 				[ opt_n, [ , [ opt_t, opt_m ] ] ] = o
-				if ([ "null", "boolean" ].includes(opt_t)) this.o[opt_n] = true
+				if (bang && opt_t !== "boolean") return this._wrong("illegal_bang", opt_n)
+
+				if ([ "null", "boolean" ].includes(opt_t))
+					this.o[opt_n] = bang ? ! this.o[opt_n] : true
 				else mod = "opt_arg"
 				break
 			case "opt_arg":
@@ -1019,7 +998,7 @@ const wargs = (name) => ({
 		}
 
 		if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
-		cmd_n ??= "help"
+		if (! flag.interactive) cmd_n ??= "help"
 		await this.trigger("run", cmd_n, raw)
 		await this.cmd[cmd_n]?.(...arg)
 
@@ -1033,8 +1012,9 @@ cli.g = wargs("g")
 	.init({
 		has_option: true,
 		wrong_usage: {
-			unknown_cmd: cmd => `Unknown command \`${cmd}\`. Use \`help\` to get usage.`,
-			too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`help ${cmd}\` to get usage.`
+			unknown_cmd: cmd_n => `Unknown command \`${cmd_n}\`. Use \`help\` to get usage.`,
+			too_many_args: cmd_n => `Too many arguments for \`${cmd_n}\`. Use \`help ${cmd_n}\` to get usage.`,
+			illegal_bang: opt_n => `Option \`${opt_n}\` is not a boolean one, so it cannot have a bang \`!\``
 		}
 	})
 	.help({ themes: info.t, extra: `
@@ -1050,20 +1030,22 @@ RELAVANT
 ?data                -> data files
 ?setting             -> the configuration
 `		})
-	.hook("run", async (C, cmd, raw) => {
+	.hook("run", async(C, cmd, raw) => {
 		if (C.o.version) {
 			Log("xbqg " + version)
 			process.exit(0)
 		}
 
+		logger.opt.noColor = flag.plain
+		if (flag.interactive) rln.rePrompt()
+
 		if (flag.lauch) {
 			flag.lauch = false
-			if (C.o.plain) logger.opt.noColor = true
-			if (cmd === "help") return
 			
 			if (! (
 				p_data = C.p_data ?? process.env.XBQG_DATA?.replace(/\/$/, "")
 			)) {
+				if (cmd === "help") return
 				Div("lauch", 0, 2)
 				Err(
 					"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
@@ -1073,9 +1055,9 @@ RELAVANT
 
 			// Note: Touch data files.
 			for (let fn in c_dft)
-				if (! await existFile(`${p_data}/${fn}.json`))
-					await c.write(fn, c_dft[fn])
-			await c.read("setting")
+				if (! fs.existsSync(`${p_data}/${fn}.json`))
+					c.write(fn, c_dft[fn])
+			c.read("setting")
 
 			// Note: Load user-defined hooks.
 			c.setting.hooks?.filter(h => h?.on)?.forEach(h =>
@@ -1086,7 +1068,7 @@ RELAVANT
 			)
 		}
 
-		history_save(raw)
+		history_save(raw.join(" "))
 	})
 cli.i = wargs("i")
 	.init({
@@ -1096,7 +1078,7 @@ cli.i = wargs("i")
 		}
 	})
 	.help({ extra: "Interactive instruction starts with a bang \`!\`." })
-	.hook("run", (_, __, raw) => history_save([ "!", ...raw ]))
+	.hook("run", (_, __, raw) => history_save("!" + raw.join(" ")))
 cli.parse_ln = async ln =>
 	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
 
