@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.0.1"
+const version		= "4.1.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -47,6 +47,42 @@ const writeJSON = (p, data) => new Promise((res, rej) =>
 		: res()
 	)
 )
+const objectPath = (obj, path, create, val) => {	
+	if (! path.match(/^[.[]/)) path = "." + path
+
+	const rsit = path.matchAll(/\.([_a-zA-Z][0-9_a-zA-Z]*)|\[(\d+)]/g)
+	let rs, o = obj, pa_o, k, pa_k, t
+	// Note:
+	// a.b.c
+	// o					pa_o				k		pa_k
+	// { a: b: { c: 1 } }	undefined			"a"		undefined
+	// { b: { c: 1 } }		{ a: b: { c: 1 } }	"b"		"a"
+	// { c: 1}				{ b: { c: 1 } }		"c"		"b"
+
+	while (! (rs = rsit.next()).done) {
+		t = !! rs.value[1] // Note: 0 Number, 1 String.
+		k = t ? rs.value[1] : Number(rs.value[2])
+
+		if (Is.objR(o)) {
+			if (t ^ Is.arr(o)) ;
+			else if (create) Err("Path type conflicted.")
+		}
+
+		else if (Is.udf(o)) {
+			if (create) o = pa_o[pa_k] = t ? {} : []
+			else Err("Path includes undefined.")
+		}
+		else if (create) Err("Path type conflicted.")
+
+		pa_o = o
+		o = o[k]
+		pa_k = k
+	}
+
+	if (create) pa_o[pa_k] = val
+
+	return pa_o[pa_k]
+}
 
 // :: Logic
 
@@ -95,7 +131,8 @@ info.g = {
 	config_edit:		[ [ "ce",	"%+"	], [ "Edit a configuration JSON file by your %`editor`.",
 												 "In default, `setting.json`." ] ],
 	config_reset:		[ [ "cr",	"%="	], [ "Reset your configuration to the default in 5 seconds.",
-												 "The task is immediately done when `now` is given." ] ],
+												 "The task is immediately done when `path` is `!`.",
+												 "Just reset the specific `path` of the configuration without delaying." ] ],
 	pagewarner_stat:	[ [ "ps",	"^-"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
 	pagewarner_diff:	[ [ "pd",	"^="	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
 	interactive:		[ [ "i",	"!"		], [ "Enter the `interactive` mode." ] ],
@@ -210,6 +247,7 @@ const history_save = async(raw) => {
 		await c.write("history")
 	}
 }
+
 cmd.g = {
 	fetch: async(page) => {
 		Div("fetch", 0, 2)
@@ -272,8 +310,6 @@ cmd.g = {
 		c.around[s] = a
 
 		await c.write("around")
-
-		await cmd.g.pagewarner_stat(true)
 
 		Div("EOF", 1, 1)
 	},
@@ -388,52 +424,29 @@ cmd.g = {
 		Div("EOF", 1, 1)
 	},
 
-	config: async(_path, _action, _val) => {
+	config: async(_path, _action, _val_) => {
 		if (! _path) {
-			Div("config list global", 0, 2)
+			Div("config read all", 0, 2)
 			Log(serialize(c.setting, { indent: 2 }))
 			Div("EOF", 1, 1)
 		}
 		else {
-			const W = !! _action
-			Div(W ? "config write" : "config read", 0, 2)
+			const create = !! _action
+			Div(create ? "config write" : "config read", 0, 2)
 
-			if (_path[0] !== "." && _path[0] !== "[") _path = "." + _path
-
-			const rsit = _path.matchAll(/\.([_a-zA-Z][0-9_a-zA-Z]*)|\[(\d+)]/g)
-			let rs, o = c.setting, pa_o, k, pa_k, t
-			// Note:
-			// a.b.c
-			// o					pa_o				k		pa_k
-			// { a: b: { c: 1 } }	undefined			"a"		undefined
-			// { b: { c: 1 } }		{ a: b: { c: 1 } }	"b"		"a"
-			// { c: 1}				{ b: { c: 1 } }		"c"		"b"
-
-			while (! (rs = rsit.next()).done) {
-				t = !! rs.value[1] // Note: 0 Number, 1 String.
-				k = t ? rs.value[1] : Number(rs.value[2])
-
-				if (Is.objR(o)) {
-					if (t ^ Is.array(o)) ;
-					else if (W) Err("Path type conflicted.")
-				}
-
-				else if (Is.udf(o)) {
-					if (W) o = pa_o[pa_k] = t ? {} : []
-				}
-				else if (W) Err("Path type conflicted.")
-
-				pa_o = o
-				o = o[k]
-				pa_k = k
-			}
-			if (W) {
-				pa_o[k] = [ "undefined", "-" ].includes(_action)
+			let val; try {
+				val = [ "undefined", "-" ].includes(_action + "")
 					? undefined
-					: JSON.parse(_action === "=" ? "\"" + _val + "\"" : _action)
-				await c.write("setting", c.setting)
+					: JSON.parse(_action === "=" ? `"${ _val_.join(" ") }"` : _action)
 			}
-			Log(serialize(W ? pa_o[k]: o, { indent: 2 }))
+			catch {
+				Err("Illegal JSON value.")
+			}
+
+			const r = objectPath(c.setting, _path, create, val)
+
+			await c.write("setting", c.setting)
+			Log(serialize(r, { indent: 2 }))
 
 			Div("EOF", 1, 1)
 		}
@@ -457,21 +470,29 @@ cmd.g = {
 		Div("EOF", 1, 1)
 	},
 
-	config_reset: async(_now) => {
+	config_reset: async(_path) => {
 		Div("config reset", 0, 2)
 
-		if (_now !== "!") {
+		if (! _path) {
 			Warn("The default setting will be restored in 5 seconds.")
 			await sleep(5000)
 		}
 
 		Log("Reseting.")
+		
+		if (_path !== "!") {
+			const r = objectPath(c.setting, _path, false,
+				objectPath(c_dft.setting, _path, false)
+			)
+			Log("\n" + serialize(r, { indent: 2 }) + "\n")
+		}
+
 		await c.write("setting", c_dft.setting)
 		Log("Done.")
 		Div("EOF", 1, 1)
 	},
 
-	pagewarner_stat: async($after_fetching) => {
+	pagewarner_stat: async() => {
 		await c.read("pagewarner")
 
 		const today = new Date().format("yyyymmdd")
@@ -501,7 +522,7 @@ cmd.g = {
 			Warn(`${n - m} page${m - n <= 1 ? "" : "s"} more than the warning num!`)
 			Warn("Suggestion: stop now!")
 		}
-		if ($after_fetching !== true) Div("EOF", 1, 1)
+		Div("EOF", 1, 1)
 	},
 
 	pagewarner_diff: async() => {
@@ -562,7 +583,7 @@ cmd.g = {
 
 			if (c.setting.interactive.allowXbqgPrefix) ln = ln.replace(/^xbqg /, "")
 
-			await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
+			await cli.parse_ln(ln)
 
 			rln.prompt()
 		})
@@ -692,7 +713,7 @@ const c_dft = {
 	          around: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /=keypage;([^]*?)cmdction keypage/
+	            regexp: /=keypage;([^]*?)function keypage/
 	          },
 	          prev: {
 	            necessary: false,
@@ -820,20 +841,19 @@ const c_dft = {
       hooks: [
         {
           on: true,
-          trigger: [ "post", "fetch" ],
-          action: {
-            cmd: "pagewarner",
-            arg: [ true ]
-          }
+          name: "anti-addiction",
+          event: [ "post-fetch" ],
+          action: [
+            "pagewarner_stat"
+          ]
         },
         {
           on: false,
           interactive: true,
-          trigger: [ "pre", "fetch" ],
-          action: {
-            cmd: "!clear",
-            arg: "!"
-          }
+          event: [ "pre-fetch" ],
+          action: [
+            "!clear !"
+          ]
         }
       ]
 	},
@@ -884,7 +904,7 @@ const wargs = (name) => ({
 			let ext, txt = ""
 			const cmd_head = (k, v) => [
 				[ k, ...v[0] ].map(Hili).join(" | "),
-				v[2].filter(o => o && o[0] !== "$").map(o => {
+				v[2].filter(o => o).map(o => {
 					const n = o.replace(/_$/, "...")
 					return n[0] === "_"
 						? "[" + Hili(n.slice(1)) + "]"
@@ -1007,20 +1027,17 @@ const wargs = (name) => ({
 	}
 })
 
-// :: Init
-
 const cli = {}
 
-const init_cli = async() => {
-	cli.g = await wargs("g")
-		.init({
-			has_option: true,
-			wrong_usage: {
-				unknown_cmd: cmd => `Unknown command \`${cmd}\`. Use \`help\` to get usage.`,
-				too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`help ${cmd}\` to get usage.`
-			}
-		})
-		.help({ themes: info.t, extra: `
+cli.g = wargs("g")
+	.init({
+		has_option: true,
+		wrong_usage: {
+			unknown_cmd: cmd => `Unknown command \`${cmd}\`. Use \`help\` to get usage.`,
+			too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`help ${cmd}\` to get usage.`
+		}
+	})
+	.help({ themes: info.t, extra: `
 CONTACT
 
 GitHub Issue         <https://github.com/ForkFG/TerminalXbqg/issues>
@@ -1033,46 +1050,57 @@ RELAVANT
 ?data                -> data files
 ?setting             -> the configuration
 `		})
-		.hook("run", async (C, cmd, raw) => {
-			if (C.o.version) {
-				Log("xbqg " + version)
-				process.exit(0)
+	.hook("run", async (C, cmd, raw) => {
+		if (C.o.version) {
+			Log("xbqg " + version)
+			process.exit(0)
+		}
+
+		if (flag.lauch) {
+			flag.lauch = false
+			if (C.o.plain) logger.opt.noColor = true
+			if (cmd === "help") return
+			
+			if (! (
+				p_data = C.p_data ?? process.env.XBQG_DATA?.replace(/\/$/, "")
+			)) {
+				Div("lauch", 0, 2)
+				Err(
+					"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
+					"Or use `xbqg --path <p_data>` to assign it."
+				)
 			}
 
-			if (flag.lauch) {
-				flag.lauch = false
-				if (C.o.plain) logger.opt.noColor = true
-				if (cmd === "help") return
-				
-				if (! (
-					p_data = C.p_data ?? process.env.XBQG_DATA?.replace(/\/$/, "")
-				)) {
-					Div("lauch", 0, 2)
-					Err(
-						"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
-						"Or use `xbqg --path <p_data>` to assign it."
-					)
-				}
+			// Note: Touch data files.
+			for (let fn in c_dft)
+				if (! await existFile(`${p_data}/${fn}.json`))
+					await c.write(fn, c_dft[fn])
+			await c.read("setting")
 
-				for (let fn in c_dft)
-					if (! await existFile(`${p_data}/${fn}.json`))
-						await c.write(fn, c_dft[fn])
-				await c.read("setting")
-			}
+			// Note: Load user-defined hooks.
+			c.setting.hooks?.filter(h => h?.on)?.forEach(h =>
+				C.hook(h.event, async() => {
+					if (flag.interactive || ! h?.interactive)
+						for (let ln of h.action) await cli.parse_ln(ln)
+				})
+			)
+		}
 
-			history_save(raw)
-		})
-		.parse()
-	cli.i = wargs("i")
-		.init({
-			wrong_usage: {
-				unknown_cmd: cmd => `Unknown instruction \`${cmd}\`. Use \`! help\` to get usage.`,
-				too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`! help ${cmd}\` to get usage.`
-			}
-		})
-		.help({ extra: "Interactive instruction starts with a bang \`!\`." })
-		.hook("run", (_, __, raw) => history_save([ "!", ...raw ]))
-}
+		history_save(raw)
+	})
+cli.i = wargs("i")
+	.init({
+		wrong_usage: {
+			unknown_cmd: cmd => `Unknown instruction \`${cmd}\`. Use \`! help\` to get usage.`,
+			too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`! help ${cmd}\` to get usage.`
+		}
+	})
+	.help({ extra: "Interactive instruction starts with a bang \`!\`." })
+	.hook("run", (_, __, raw) => history_save([ "!", ...raw ]))
+cli.parse_ln = async ln =>
+	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
 
-init_cli()
+// :: Ugly IIAFE
+
+; (async() => await cli.g.parse())()
 
