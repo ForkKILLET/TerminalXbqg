@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.2.0"
+const version		= "4.3.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -66,8 +66,8 @@ const objectPath = (obj, path, create, val) => {
 const c = {
 	read: (n, force) => {
 		if (force && c[n]) return c[n]
-		c[n] = JSON.parse(fs.readFileSync(p_file(n), "utf8").toString())
 		if (flag.debug) Log(Hili("xbqg% ") + `read ${n}`)
+		return c[n] = JSON.parse(fs.readFileSync(p_file(n), "utf8").toString())
 	},
 	read_json: n => fs.readFileSync(p_file(n), "utf8").toString(),
 	write: (n, data) => {
@@ -124,6 +124,9 @@ info.g = {
 	interactive:		[ [ "i",	"!"		], [ "Enter the `interactive` mode." ] ],
 	history:			[ [ "hi",	"~"		], [ "Show history." ] ],
 	history_reset:		[ [ "hr",	"~="	], [ "Reset history." ] ],
+	hook:				[ [ "k",	"/"		], [ "Trigger a `name`d hook manually." ] ],
+	hook_show:			[ [ "ks",	"/-"	], [ "Show your hooks." ] ],
+	hook_toggle:		[ [ "kt",	"/="	], [ "Toggle a `name`d hook." ] ],
 	help:				[ [ "h",	"?"		], [ "Show help of the given `theme` or `command name`.",
 												 "Show usage when no arguments is given."] ],
 }
@@ -295,7 +298,6 @@ cmd.g = {
 
 		Div("EOF", 1, 1)
 	},
-
 	fetch_prev: fetch_alias("prev"),
 	fetch_curr: fetch_alias("curr"),
 	fetch_next: fetch_alias("next"),
@@ -304,7 +306,7 @@ cmd.g = {
 		Div("around", 0, 2)
 
 		c.read("around")
-		Log(serialize(c.around[c.setting.source.active], { indent: 2 }))
+		Log(c.around[c.setting.source.active])
 
 		Div("EOF", 1, 1)
 	},
@@ -335,10 +337,9 @@ cmd.g = {
 	book_show: () => {
 		Div("book show", 0, 2)
 		// TODO: better display
-		Log(c.read_json("books"))
+		Log(c.read("books"))
 		Div("EOF", 1, 1)
 	},
-
 	book_mark: (_name) => {
 		Div("book mark", 0, 2)
 
@@ -367,7 +368,6 @@ cmd.g = {
 		Log(newBook ? "Added." : "Updated.")
 		Div("EOF", 1, 1)
 	},
-
 	book_fetch: async(name) => {
 		Div("book fetch", 0, 1)
 
@@ -391,7 +391,6 @@ cmd.g = {
 		Log(`Fetching book \`${name}\`.`)
 		await cmd.g.fetch(a[s].curr)
 	},
-
 	book_browse: () => {
 		Div("book browse", 0, 2)
 
@@ -409,7 +408,7 @@ cmd.g = {
 	config: (_path, _action, _val_) => {
 		if (! _path) {
 			Div("config read all", 0, 2)
-			Log(serialize(c.setting, { indent: 2 }))
+			Log(c.setting)
 			Div("EOF", 1, 1)
 		}
 		else {
@@ -428,12 +427,11 @@ cmd.g = {
 			const r = objectPath(c.setting, _path, create, val)
 
 			c.write("setting", c.setting)
-			Log(serialize(r, { indent: 2 }))
+			Log(r)
 
 			Div("EOF", 1, 1)
 		}
 	},
-
 	config_edit: async(_file) => {
 		const path = p_data + "/" + (_file ?? "setting") + ".json"
 		const editor = exT(c.setting.editor, { path })
@@ -451,7 +449,6 @@ cmd.g = {
 		Log(`Done.`)
 		Div("EOF", 1, 1)
 	},
-
 	config_reset: async(_path) => {
 		Div("config reset", 0, 2)
 
@@ -466,7 +463,7 @@ cmd.g = {
 			const r = objectPath(c.setting, _path, false,
 				objectPath(c_dft.setting, _path, false)
 			)
-			Log("\n" + serialize(r, { indent: 2 }) + "\n")
+			Log("\n%o\n", r)
 		}
 
 		c.write("setting", c_dft.setting)
@@ -506,7 +503,6 @@ cmd.g = {
 		}
 		Div("EOF", 1, 1)
 	},
-
 	pagewarner_diff: () => {
 		c.pagewarner = c.read("pagewarner")
 
@@ -578,7 +574,6 @@ cmd.g = {
 		Log(c.history.join("\n"))
 		Div("EOF", 1, 1)
 	},
-
 	history_reset: () => {
 		Div("history reset", 0, 2)
 
@@ -586,6 +581,34 @@ cmd.g = {
 		c.write("history", c_dft.history)
 		Log("Done.")
 		Div("EOF", 1, 1)
+	},
+
+	hook: async(name) => {
+		Div("hook execute", 0, 1)
+
+		await cli.g._hook._execute(cli.g._hook._find(name))
+
+		Div("EOH", 0, 1)
+	},
+	hook_show: () => {
+		Div("hook show", 0, 2)
+
+		Log(c.setting.hooks)
+
+		Div("EOF", 1, 1)
+	},
+	hook_toggle: (name) => {
+		Div("hook toggle", 0, 1)
+		
+		const h =  cli.g._hook._find(name)
+		if (! h) Warn("Not found.")
+		else {
+			h.on = ! h.on
+			c.write("setting")
+			
+			Log(h.on ? "Enabled." : "Disabled.")
+		}
+		Div("EOF", 0, 1)
 	}
 }
 cmd.i = {
@@ -823,6 +846,7 @@ const c_dft = {
         },
         {
           on: false,
+          name: "page-refresh",
           interactive: true,
           event: [ "pre-fetch" ],
           action: [
@@ -888,10 +912,13 @@ const wargs = (name) => ({
 
 			if (! _theme) {
 				if (this.has_option) txt = "OPTIONS\n\n"
-					+ Table(Object.entries(this.opt).map(([ k, v ]) => [
-						"--" + Hili(k) + " | -" + Hili(v[0]),
-						v[2] + (v[1][0] === "boolean" ? ", toggle with a bang `!`." : "")
-					]), [ 25 ])
+					+ Table(Object.entries(this.opt).map(([ k, v ]) => {
+						const bool = v[1][0] === "boolean"
+						return [
+							"--" + Hili(k) +  " | -" + Hili(v[0]) + (bool ? `[${ Hili("!") }]` : ""),
+							v[2] + (bool ? ", toggle with a bang `!`." : "")
+						]
+					}), [ 25 ])
 				txt	+= "\n\nCOMMANDS\n\n"
 					+ Table(
 						Object.entries(this.info).map(([ k, v ]) => {
@@ -923,14 +950,32 @@ const wargs = (name) => ({
 
 		return this
 	},
-	_hook: {},
+	_hook: {
+		_find: name => c.setting.hooks.find(h => h.name === name),
+		_execute: async h => {
+			if (! h) return
+			if (flag.interactive || ! h?.interactive)
+			for (let ln of h.action) await cli.parse_ln(ln)
+		}
+	},
 	trigger(event, ...A) {
-		return Promise.all((Is.arr(event) ? event : [ event ]).map(e => new Promise(res =>
-			setTimeout(async() => res(await this._hook[e]?.(this, ...A)), 0)
-		)))
+		if (! Is.arr(event)) event = [ event ]
+		if (flag.debug) Log(Hili("xbqg% ") + `trigger ${ event.join(", ") }`)
+		return Promise.all(event
+			.filter(e => this._hook[e])
+			.map(e =>
+				this._hook[e].map(h =>
+					new Promise(res =>
+						setImmediate(async() => res(await h?.(this, ...A)))
+					)
+				)
+			)
+			.flat()
+		)
 	},
 	hook(event, cb) {
-		this._hook[event] = cb
+		if (! this._hook[event]) this._hook[event] = []
+		this._hook[event].push(cb)
 		return this
 	},
 	_wrong(sit, ...A) {
@@ -1061,10 +1106,7 @@ RELAVANT
 
 			// Note: Load user-defined hooks.
 			c.setting.hooks?.filter(h => h?.on)?.forEach(h =>
-				C.hook(h.event, async() => {
-					if (flag.interactive || ! h?.interactive)
-						for (let ln of h.action) await cli.parse_ln(ln)
-				})
+				C.hook(h.event,  async() => C._hook._execute(h))
 			)
 		}
 
