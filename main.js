@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.3.0"
+const version		= "4.3.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -877,9 +877,10 @@ const wargs = (name) => ({
 	},
 	_init_cmd(cmds) {
 		for (let n of cmds) {
-			this.info[n].push(
+			this.info[n][2] =
 				this.cmd[n].toString().match(/^(async)?\((.*)\)/)?.[2]?.split(", ")
-			)
+			this.info[n][2].req =
+				this.info[n][2].reduce((x, s) => s.startWith("_") ? x : x + 1, 0)
 			this.cmd[n] = new Proxy(this.cmd[n], {
 				apply: async(f, _, $) => {
 					await this.trigger([ "pre-" + n, "pre*" ], _, n)
@@ -1042,6 +1043,8 @@ const wargs = (name) => ({
 			}
 		}
 
+		if (arg.length < arg_i.req) return this._wrong("too_few_args", cmd_n, arg_i.req)
+
 		if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
 		if (! flag.interactive) cmd_n ??= "help"
 		await this.trigger("run", cmd_n, raw)
@@ -1059,6 +1062,8 @@ cli.g = wargs("g")
 		wrong_usage: {
 			unknown_cmd: cmd_n => `Unknown command \`${cmd_n}\`. Use \`help\` to get usage.`,
 			too_many_args: cmd_n => `Too many arguments for \`${cmd_n}\`. Use \`help ${cmd_n}\` to get usage.`,
+			too_few_args: (cmd_n, req) => `Too few arguments for \`${cmd_n}\`, required ${req}. `
+				+ `Use \`help ${cmd_n}\` to get usage.`,
 			illegal_bang: opt_n => `Option \`${opt_n}\` is not a boolean one, so it cannot have a bang \`!\``
 		}
 	})
