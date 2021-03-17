@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.3.1"
+const version		= "4.4.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -131,11 +131,11 @@ info.g = {
 												 "Show usage when no arguments is given."] ],
 }
 info.i = {
-	exit:		[ [ "!",	"e"	], [ "Exit the interactive mode." ] ],
-	clear:		[ [ "-",	"c" ], [ "Clear the console." ] ],
-	eval:		[ [ "+",	"v"	], [ "Run Javascript code." ] ],
-	shell:		[ [ "^",	"s"	], [ "Run command in shell." ] ],
-	help:		[ [ "?",	"h" ], [ "Show help of the given `theme` or `command name`." ] ],
+	exit:		[ [ "e",	"!"	], [ "Exit the interactive mode." ] ],
+	clear:		[ [ "c",	"-" ], [ "Clear the console." ] ],
+	eval:		[ [ "v",	"+"	], [ "Run Javascript code." ] ],
+	shell:		[ [ "s",	"^"	], [ "Run command in shell." ] ],
+	help:		[ [ "h",	"?" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 info.t = {
 	data: `
@@ -234,6 +234,20 @@ const history_save = ln => {
 		c.write("history")
 	}
 }
+const interactive_completer = ln => {
+	const bang = ln[0] === "!", cmd_n = ln.replace(/^!/, "")
+	const s = []
+	if (! ln.includes(" ") && ln.trim())
+		Object.entries(info[ bang ? "i" : "g" ])
+			.forEach(([ k, v ]) => s.push(
+				[ k, ...v[0] ].find(n => n.startsWith(cmd_n))
+			)
+		)
+	return [
+		s.filter(n => n).map(n => (bang ? "!" : "") + n),
+		ln
+	]
+}
 
 cmd.g = {
 	fetch: async(page) => {
@@ -315,7 +329,7 @@ cmd.g = {
 		if (_src) {
 			Div("source switch", 0, 1)
 
-			_src = Object.keys(c.setting.source.list).find(n => n !== "global" && n.startWith(_src))
+			_src = Object.keys(c.setting.source.list).find(n => n !== "global" && n.startsWith(_src))
 			
 			if (_src) {
 				c.setting.source.active = _src
@@ -374,7 +388,7 @@ cmd.g = {
 		if (! name) Err("Book name can't be null.")
 		c.read("books")
 
-		name = Object.keys(c.books).find(n => n.startWith(name))
+		name = Object.keys(c.books).find(n => n.startsWith(name))
 		const a = c.books[name]
 		let s = c.setting.source.active
 		if (a?.[s]) ;
@@ -541,6 +555,7 @@ cmd.g = {
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
+			completer: interactive_completer,
 			removeHistoryDuplicates: true
 		})
 		rln.rePrompt = () => rln.setPrompt(exT(c.setting.interactive.prompt, { hili: s => Hili(s) }))
@@ -877,10 +892,9 @@ const wargs = (name) => ({
 	},
 	_init_cmd(cmds) {
 		for (let n of cmds) {
-			this.info[n][2] =
-				this.cmd[n].toString().match(/^(async)?\((.*)\)/)?.[2]?.split(", ")
-			this.info[n][2].req =
-				this.info[n][2].reduce((x, s) => s.startWith("_") ? x : x + 1, 0)
+			const arg = this.info[n][3] =
+				this.cmd[n].toString().match(/^(async)?\((.*)\)/)?.[2]?.split(", ").filter(s => s)
+			arg.req = arg.reduce((x, s) => s.startsWith("_") ? x : x + 1, 0)
 			this.cmd[n] = new Proxy(this.cmd[n], {
 				apply: async(f, _, $) => {
 					await this.trigger([ "pre-" + n, "pre*" ], _, n)
@@ -903,7 +917,7 @@ const wargs = (name) => ({
 			let ext, txt = ""
 			const cmd_head = (k, v) => [
 				[ k, ...v[0] ].map(Hili).join(" | "),
-				v[2].filter(o => o).map(o => {
+				v[3].map(o => {
 					const n = o.replace(/_$/, "...")
 					return n[0] === "_"
 						? "[" + Hili(n.slice(1)) + "]"
@@ -920,7 +934,8 @@ const wargs = (name) => ({
 							v[2] + (bool ? ", toggle with a bang `!`." : "")
 						]
 					}), [ 25 ])
-				txt	+= "\n\nCOMMANDS\n\n"
+					+ "\n\n"
+				txt	+= "COMMANDS\n\n"
 					+ Table(
 						Object.entries(this.info).map(([ k, v ]) => {
 							const tab = [ cmd_head(k, v) ]
@@ -1029,7 +1044,7 @@ const wargs = (name) => ({
 				const c = this._find_cmd(tk)
 				if (! c) return this._wrong("unknown_cmd", tk);
 				[ cmd_n ] = c
-				arg_i = this.info[cmd_n][2]
+				arg_i = this.info[cmd_n][3]
 				mod = "cmd_arg"
 				break
 			case "cmd_arg":
