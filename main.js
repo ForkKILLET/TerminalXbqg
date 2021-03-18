@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.4.0"
+const version		= "4.4.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -210,7 +210,7 @@ const fetch_alias = name => async() => {
 	Div("page info", 0, 1)
 
 	c.read("around")
-	const page = c.around[c.setting.source.active]?.[name]
+	const page = c.around[c.setting?.source?.active]?.[name]
 
 	if (page) {
 		c.read("pagewarner")
@@ -228,7 +228,7 @@ const fetch_alias = name => async() => {
 	}
 }
 const history_save = ln => {
-	if (c.setting.history.on) {
+	if (c.setting?.history?.on) {
 		c.read("history")
 		c.history.push(ln)
 		c.write("history")
@@ -254,8 +254,8 @@ cmd.g = {
 		Div("fetch", 0, 2)
 		if (! page) Err("Page can't be null.")
 
-		const s = c.setting.source.active, src = c.setting.source.list[s]
-		const g = c.setting.source.list.global
+		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
+		const g = c.setting?.source?.list?.global
 		const matcher = Object.assign({}, g.matcher, src.matcher ?? {})
 		const replacer = g.replacer.concat(src.replacer ?? [])
 		const blocks = {}
@@ -320,7 +320,7 @@ cmd.g = {
 		Div("around", 0, 2)
 
 		c.read("around")
-		Log(c.around[c.setting.source.active])
+		Log(c.around[c.setting?.source?.active])
 
 		Div("EOF", 1, 1)
 	},
@@ -329,7 +329,7 @@ cmd.g = {
 		if (_src) {
 			Div("source switch", 0, 1)
 
-			_src = Object.keys(c.setting.source.list).find(n => n !== "global" && n.startsWith(_src))
+			_src = Object.keys(c.setting?.source?.list)?.find(n => n !== "global" && n?.startsWith(_src))
 			
 			if (_src) {
 				c.setting.source.active = _src
@@ -343,7 +343,7 @@ cmd.g = {
 		}
 		else {
 			Div("source active", 0, 1)
-			Log(c.setting.source.active)
+			Log(c.setting?.source?.active)
 			Div("EOF", 0, 1)
 		}
 	},
@@ -360,8 +360,8 @@ cmd.g = {
 		c.read("around")
 		c.read("books")
 
-		const s = c.setting.source.active
-		const re = RegExp(c.setting.source.list[s].matchKeyInAround)
+		const s = c.setting?.source?.active
+		const re = RegExp(c.setting?.source?.list[s]?.matchKeyInAround)
 		const key = c.around[s]?.curr.match(re)[1]
 
 		if (! key) Err("No around is found.")
@@ -390,10 +390,10 @@ cmd.g = {
 
 		name = Object.keys(c.books).find(n => n.startsWith(name))
 		const a = c.books[name]
-		let s = c.setting.source.active
+		let s = c.setting?.source?.active
 		if (a?.[s]) ;
-		else if (c.setting.source.autoSwitching) {
-			c.setting.source.active = s = Object.keys(a)[0]
+		else if (c.setting?.source?.autoSwitching) {
+			c.setting.source.active = s = Object?.keys(a)[0]
 			Log(`Auto switching source to \`${s}\`.`)
 			c.write("setting")
 		}
@@ -409,8 +409,8 @@ cmd.g = {
 		Div("book browse", 0, 2)
 
 		c.read("around")
-		const s = c.setting.source.active, src = c.setting.source.list[s]
-		const browser = c.setting.browser
+		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
+		const browser = c.setting?.browser
 		const url = exT(src.url, { page: c.around[s].curr })
 		Log("Running " + Hili(`${browser ?? "browser"} ${url}`))
 		open(url, { app: { name: browser } })
@@ -448,7 +448,7 @@ cmd.g = {
 	},
 	config_edit: async(_file) => {
 		const path = p_data + "/" + (_file ?? "setting") + ".json"
-		const editor = exT(c.setting.editor, { path })
+		const editor = exT(c.setting?.editor, { path })
 
 		Div("config edit", 0, 2)
 		Log("Running " + Hili("$ " + editor))
@@ -473,14 +473,16 @@ cmd.g = {
 
 		Log("Reseting.")
 		
-		if (_path !== "!") {
-			const r = objectPath(c.setting, _path, false,
-				objectPath(c_dft.setting, _path, false)
-			)
-			Log("\n%o\n", r)
+		if (_path && _path !== "!") {
+			const dft = objectPath(c_dft.setting, _path, false)
+			objectPath(c.setting, _path, true, dft)
+			Log("\n%o\n", dft)
+			c.write("setting")
 		}
 
-		c.write("setting", c_dft.setting)
+		else {
+			c.write("setting", c_dft.setting)
+		}
 		Log("Done.")
 		Div("EOF", 1, 1)
 	},
@@ -489,19 +491,19 @@ cmd.g = {
 		c.read("pagewarner")
 
 		const today = new Date().format("yyyymmdd")
-		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner.warnNum
+		const n = c.pagewarner[today] ?? 0, m = c.setting?.pagewarner?.warnNum
 
 		Div("pagewarner stat", 0, 2)
 		if (n <= m) {
-			if (c.setting.pagewarner.onlyWarnAfterFetching === true) return
+			if (c.setting?.pagewarner?.onlyWarnAfterFetching === true) return
 
 			Log(`Reading progress today: [${n} / ${m}]`)
 			Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
-			const l = c.setting.pagewarner.progressStyle.stat.length
+			const l = c.setting?.pagewarner?.progressStyle?.stat?.length
 			let nc = parseInt(n / m * l)
 			if (nc < 0) nc = 0
 			exTLog(
-				c.setting.pagewarner.progressStyle.stat.fommat,
+				c.setting?.pagewarner?.progressStyle?.stat?.fommat,
 				"setting.pagewarner.progressStyle.stat.fommat", {
 					progress: ($, f, b) =>
 						Hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
@@ -522,13 +524,13 @@ cmd.g = {
 
 		Div("pagewarner diff", 0, 2)
 
-		const l = c.setting.pagewarner.progressStyle.diff.length
+		const l = c.setting?.pagewarner?.progressStyle?.diff?.length
 		let m = l; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
 
 		for (let d in c.pagewarner) {
 			const n = c.pagewarner[d]
 			exTLog(
-				c.setting.pagewarner.progressStyle.diff.fommat,
+				c.setting?.pagewarner?.progressStyle?.diff?.fommat,
 				"setting.pagewarner.progressStyle.diff.fommat", {
 					date: d,
 					progress: (_, f) =>
@@ -558,9 +560,9 @@ cmd.g = {
 			completer: interactive_completer,
 			removeHistoryDuplicates: true
 		})
-		rln.rePrompt = () => rln.setPrompt(exT(c.setting.interactive.prompt, { hili: s => Hili(s) }))
+		rln.rePrompt = () => rln.setPrompt(exT(c.setting?.interactive?.prompt, { hili: s => Hili(s) }))
 		
-		let n = c.setting.history.loadToInteractive
+		let n = c.setting?.history?.loadToInteractive
 		if (n) {
 			c.read("history")
 			rln.history = c.history.slice(- n).reverse()
@@ -574,7 +576,7 @@ cmd.g = {
 				return
 			}
 
-			if (c.setting.interactive.allowXbqgPrefix) ln = ln.replace(/^xbqg /, "")
+			if (c.setting?.interactive?.allowXbqgPrefix) ln = ln?.replace(/^xbqg /, "")
 
 			await cli.parse_ln(ln)
 
@@ -608,7 +610,7 @@ cmd.g = {
 	hook_show: () => {
 		Div("hook show", 0, 2)
 
-		Log(c.setting.hooks)
+		Log(c.setting?.hooks)
 
 		Div("EOF", 1, 1)
 	},
@@ -633,7 +635,7 @@ cmd.i = {
 	},
 	clear: async(_force) => {
 		if (_force === "!")
-			await execa.command(c.setting.interactive.forceClearCommand, std)
+			await execa.command(c.setting?.interactive?.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
 	eval: (code_) => {
@@ -666,7 +668,7 @@ opt.g = {
 
 const c_dft = {
 	setting: {
-	  editor: "vi ${path}",
+	  editor: "vim ${path}",
       browser: null,
 	  interactive: {
 	    prompt: "!{ hili | xbqg$ } ",
@@ -674,7 +676,7 @@ const c_dft = {
         allowXbqgPrefix: true
 	  },
 	  pagewarner: {
-	    warnNum: 50,
+	    warnNum: 20,
 	    onlyWarnAfterFetching: false,
 	    progressStyle: {
 	      stat: {
@@ -967,7 +969,7 @@ const wargs = (name) => ({
 		return this
 	},
 	_hook: {
-		_find: name => c.setting.hooks.find(h => h.name === name),
+		_find: name => c.setting?.hooks?.find(h => h?.name === name),
 		_execute: async h => {
 			if (! h) return
 			if (flag.interactive || ! h?.interactive)
@@ -1125,9 +1127,10 @@ RELAVANT
 			c.read("setting")
 
 			// Note: Load user-defined hooks.
-			c.setting.hooks?.filter(h => h?.on)?.forEach(h =>
-				C.hook(h.event,  async() => C._hook._execute(h))
-			)
+			if (Is.arr(c.setting?.hooks))
+				c.setting.hooks.filter(h => h?.on)?.forEach(h =>
+					C.hook(h.event,  async() => C._hook._execute(h))
+				)
 		}
 
 		history_save(raw.join(" "))
