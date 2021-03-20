@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.4.1"
+const version		= "4.5.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -409,13 +409,19 @@ cmd.g = {
 		Div("book browse", 0, 2)
 
 		c.read("around")
+
 		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
 		const browser = c.setting?.browser
-		const url = exT(src.url, { page: c.around[s].curr })
-		Log("Running " + Hili(`${browser ?? "browser"} ${url}`))
-		open(url, { app: { name: browser } })
 
-		Log("Done.")
+		if (! c.around[s]) Warn("Not found.")
+
+		else {
+			const url = exT(src.url, { page: c.around[s].curr })
+			Log("Running " + Hili(`${browser ?? "browser"} ${url}`))
+			open(url, { app: { name: browser } })
+
+			Log("Done.")
+		}
 		Div("EOF", 1, 1)
 	},
 
@@ -715,7 +721,7 @@ const c_dft = {
 	          bookName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /-(.*?) - 新笔趣阁$/
+	            regexp: /-(.+?) - 新笔趣阁$/
 	          },
 	          chapterName: {
 	            necessary: true,
@@ -725,22 +731,22 @@ const c_dft = {
 	          content: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<div id="content">([^]*?)<\/div>/
+	            regexp: /<div id="content">([^]+?)<\/div>/
 	          },
 	          around: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /=keypage;([^]*?)function keypage/
+	            regexp: /=keypage;([^]+?)function keypage/
 	          },
 	          prev: {
 	            necessary: false,
 	            from: "around",
-	            regexp: /prevpage="\/(.*?).html"/
+	            regexp: /prevpage="\/(.+?).html"/
 	          },
 	          next: {
 	            necessary: false,
 	            from: "around",
-	            regexp: /nextpage="\/(.*?).html"/
+	            regexp: /nextpage="\/(.+?).html"/
 	          }
 	        },
 	        matchKeyInAround: /(.*)\//
@@ -761,17 +767,17 @@ const c_dft = {
 	          content: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<div id="content">([^]*?)<\/div>/
+	            regexp: /<div id="content">([^]+?)<\/div>/
 	          },
 	          prev: {
 	            necessary: true,
 	            from: "",
-	            regexp: /<a href="\/b\/(.*?).html">上一章<\/a>/
+	            regexp: /<a href="\/b\/(.+?).html">上一章<\/a>/
 	          },
 	          next: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<a href="\/b\/(.*?).html">下一章<\/a>/
+	            regexp: /<a href="\/b\/(.+?).html">下一章<\/a>/
 	          }
 	        },
 	        matchKeyInAround: /(.*)\//
@@ -782,27 +788,27 @@ const c_dft = {
 	          bookName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /\s*(.*?)_/
+	            regexp: /\s*(.+?)_/
 	          },
 	          chapterName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /_(.*?)_笔趣阁/
+	            regexp: /_(.+?)_笔趣阁/
 	          },
 	          content: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<div id="chapter_con" class="chapter_con">([^]*?)<\/div>/
+	            regexp: /<div id="chapter_con" class="chapter_con">([^]+?)<\/div>/
 	          },
 	          prev: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<a href="\/wapbook\/(.*?)\.html">上一章<\/a>/
+	            regexp: /<a href="\/wapbook\/(.+?)\.html">上一章<\/a>/
 	          },
 	          next: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<a href="\/wapbook\/(.*?)\.html">下一章<\/a>/
+	            regexp: /<a href="\/wapbook\/(.+?)\.html">下一章<\/a>/
 	          }
 	        },
 	        replacer: [
@@ -816,27 +822,27 @@ const c_dft = {
 	          bookName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /_(.*?)小说在线阅读/
+	            regexp: /_(.+?)小说在线阅读/
 	          },
 	          chapterName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /^ (.*?)_/
+	            regexp: /^ (.+?)_/
 	          },
 	          content: {
 	            necessary: true,
 	            from: "html",
-	            regexp: /<div id="content">([^]*?)<\/div>/
+	            regexp: /<div id="content">([^]+?)<\/div>/
 	          },
 	          prev: {
 	            necessary: false,
 	            from: "html",
-	            regexp: /<a href="\/book\/([0-9\/]*?).htm">上一章<\/a>/
+	            regexp: /<a href="\/book\/([0-9\/]+?).htm">上一章<\/a>/
 	          },
 	          next: {
 	            necessary: false,
 	            from: "html",
-	            regexp: /<a href="\/book\/([0-9\/]*?).htm">下一章<\/a>/
+	            regexp: /<a href="\/book\/([0-9\/]+?).htm">下一章<\/a>/
 	          }
 	        },
 	        replacer: [
@@ -845,7 +851,45 @@ const c_dft = {
 	          [ /一秒记住，精彩小说无弹窗免费阅读！/, "" ]
 	        ],
 	        matchKeyInAround: /(.*)\//
-	      }
+	      },
+          "tvbts": {
+            url: "http://www.tvbts.com/${page}.html",
+	        matcher: {
+	          bookName: {
+	            necessary: true,
+	            from: "title",
+	            regexp: /_(.+?)_TVB小说网/
+	          },
+	          chapterName: {
+	            necessary: true,
+	            from: "title",
+	            regexp: /^(.+?)_/
+	          },
+	          content: {
+	            necessary: true,
+	            from: "html",
+	            regexp: /<div id="content"[^]*?>([^]+?)<\/div>/
+	          },
+	          prev: {
+	            necessary: false,
+	            from: "html",
+	            regexp: /<a href="\/([0-9_\/]+?).html" target="_top" class="pre">/
+	          },
+	          next: {
+	            necessary: false,
+	            from: "html",
+	            regexp: /<a href="\/([0-9_\/]+?).html" target="_top" class="next">/
+	          }
+	        },
+            replacer: [
+              [ /天才一秒记住本站地址：[^]+$/, "" ],
+              [ /<p style="font-size:16px;">[^]+$/, "" ],
+              [ /转载请注明出处：<a.+?<\/a>/, "" ],
+              [ /\S+?提示您：看后求收藏.+?，接着再看更方便。/, "" ],
+              [ /《\S+?》来源：<a.+?<\/a>/, "" ]
+            ],
+	        matchKeyInAround: /(.*)\//
+          }
 	    }
 	  },
       history: {
@@ -868,6 +912,14 @@ const c_dft = {
           event: [ "pre-fetch" ],
           action: [
             "!clear !"
+          ]
+        },
+        {
+          on: true,
+          name: "auto-bookmark",
+          event: [ "pre-book_fetch" ],
+          action: [
+            "book_mark"
           ]
         }
       ]
