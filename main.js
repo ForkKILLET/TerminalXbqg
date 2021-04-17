@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.5.0"
+const version		= "4.5.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -13,6 +13,7 @@ const {
 	sleep, httpx, exTemplate: exT, serialize,
 	Logger
 }					= require("fkutil")
+const Debug			= (...msg) => flag.debug && Log(Hili("xbqg% "), ...msg)
 
 const logger		= Logger({ noColor: false }).bind(), {
 	warn: Warn, errEOF: Err, log: Log, div: Div,
@@ -66,7 +67,7 @@ const objectPath = (obj, path, create, val) => {
 const c = {
 	read: (n, force) => {
 		if (force && c[n]) return c[n]
-		if (flag.debug) Log(Hili("xbqg% ") + `read ${n}`)
+		Debug(`read ${n}`)
 		return c[n] = JSON.parse(fs.readFileSync(p_file(n), "utf8").toString())
 	},
 	read_json: n => fs.readFileSync(p_file(n), "utf8").toString(),
@@ -77,7 +78,7 @@ const c = {
 				? c[n]
 				: serialize(c[n], { regexp: true, indent: 2 })
 			)), "utf8")
-		if (flag.debug) Log(Hili("xbqg% ") + `write ${n}`)
+		Debug(`write ${n}`)
 	}
 }
 
@@ -92,20 +93,20 @@ const p_file = n => `${p_data}/${n}.json`
 
 const info = {}
 info.g = {
-	fetch:				[ [ "f",	":"		], [ "Fetch a page by specific `page` id." ] ],
-	source:				[ [ "s",	":="	], [ "Modify the active `source`. Prefix matching is OK.",
+	fetch:				[ [ "f",	"."		], [ "Fetch a page by specific `page` id." ] ],
+	source:				[ [ "s",	".="	], [ "Modify the active `source`. Prefix matching is OK.",
 												 "Show the active `source` when no argument is given." ] ],
-	fetch_prev:			[ [ "fp",	"["		], [ "Fetch the `prev`ious page." ] ],
-	fetch_curr:			[ [ "fc",	"="		], [ "Fetch the `curr`ent page." ] ],
+	fetch_prev:			[ [ "p",	"["		], [ "Fetch the `prev`ious page." ] ],
+	fetch_curr:			[ [ "c",	"="		], [ "Fetch the `curr`ent page." ] ],
 	fetch_next:			[ [ "n",	"]"		], [ "Fetch the `next` page." ] ],
 	around:				[ [ "a",	"-"		], [ "Show `around` information,",
 												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
 	book_show:			[ [ "bs",	"@-"	], [ "Show your `bookcase`." ] ],
 	book_mark:			[ [ "bm",	"@+"	], [ "Add the current page to your `bookcase` and give it a `name`.",
 												 "Update when the book `name` already exists." ] ],
-	book_fetch:			[ [ "bf",	"@:"	], [ "Fetch the page you read before of a named book in your `bookcase`.",
+	book_fetch:			[ [ "b",	"@"		], [ "Fetch the page you read before of a named book in your `bookcase`.",
 												 "Prefix matching is OK." ] ],
-	book_browse:		[ [ "bb",	"@@"	], [ "Open the current page in your browser" ] ],
+	book_browse:		[ [ "bb",	"@!"	], [ "Open the current page in your browser" ] ],
 	config:				[ [ "c",	"%"		], [ "Print the whole configuration when no arguments is given.",
 												 "Print a specific item by the given `JSON path`.",
 												 "e.g. `xbqg c a.b[42].c`",
@@ -114,13 +115,13 @@ info.g = {
 												 "Modify the specific item. Argument `=` turns the `value` into a string.",
 												 "e.g. `xbqg c a.boolean true` and",
 												 "     `xbqg c a.string = true` or `xbqg c a.string \\\"true\\\"`" ] ],
-	config_edit:		[ [ "ce",	"%+"	], [ "Edit a configuration JSON file by your %`editor`.",
+	config_edit:		[ [ "ce",	"%!"	], [ "Edit a configuration JSON file by your %`editor`.",
 												 "In default, `setting.json`." ] ],
 	config_reset:		[ [ "cr",	"%="	], [ "Reset your configuration to the default in 5 seconds.",
 												 "The task is immediately done when `path` is `!`.",
 												 "Just reset the specific `path` of the configuration without delaying." ] ],
-	pagewarner_stat:	[ [ "ps",	"^-"	], [ "Show today's `pagewarner` information using a progress bar." ] ],
-	pagewarner_diff:	[ [ "pd",	"^="	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
+	pagewarner_stat:	[ [ "ps",	"^"		], [ "Show today's `pagewarner` information using a progress bar." ] ],
+	pagewarner_diff:	[ [ "pd",	"^-"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
 	interactive:		[ [ "i",	"!"		], [ "Enter the `interactive` mode." ] ],
 	history:			[ [ "hi",	"~"		], [ "Show history." ] ],
 	history_reset:		[ [ "hr",	"~="	], [ "Reset history." ] ],
@@ -131,10 +132,10 @@ info.g = {
 												 "Show usage when no arguments is given."] ],
 }
 info.i = {
-	exit:		[ [ "e",	"!"	], [ "Exit the interactive mode." ] ],
+	exit:		[ [ "e",	"!"	], [ "Exit interactive-mode." ] ],
 	clear:		[ [ "c",	"-" ], [ "Clear the console." ] ],
 	eval:		[ [ "v",	"+"	], [ "Run Javascript code." ] ],
-	shell:		[ [ "s",	"^"	], [ "Run command in shell." ] ],
+	shell:		[ [ "s",	"$"	], [ "Run command in shell." ] ],
 	help:		[ [ "h",	"?" ], [ "Show help of the given `theme` or `command name`." ] ],
 }
 info.t = {
@@ -149,52 +150,69 @@ RELAVANT
 	setting: `
 Since all formats of data become Javascript object when the script runs,
 Javascript style \`path\` is used below.
+` + `
+editor: string <- config_edit
+# the editor for opening your data files
 
-.editor: string
-# what to edit your data files with
-interactive: object
+interactive <- interactive
     prompt: string
-    # what to display before your cursor in the interactive mode
-    forceClearCommand: string
-    # how to clear the console history instead of the current screen.
+    # what to display before your cursor in interactive-mode
+    forceClearCommand: string <- !clear !
+    # the command for clearing the console history instead of the current screen
+    allowXbqgPrefix: boolean
+    # whether to allow commands like \`xbqg ]\`
+    # helpful when you aren't used to interactive-mode
+    allowComplete: boolean
+    # whether to complete the command when pressing tab
 
-pagewarner: object
+pagewarner <- pagewarner*
     warnNum: integer
-    # how much pages you decided to read at most.
-    onlyWarnAfterFetching
-    # whether display the pagewarner after \`fetch\`ing
-      when only you reach the \`warnNum\`.
-    progressStyle: object
-        stat: object
+    # how much pages you decided to read every day at most
+    onlyWarnAfterFetching <- hook anti-addiction
+    # whether display the pagewarner when only you reach the \`warnNum\`
+    progressStyle
+        stat <- pagewarner_stat
             length: integer
             fommat: string
-        diff: object
+        diff <- pagewarner_diff
             length: integer
             fommat: string
 
-source: object
+source
     active: string
     # what source to use now among the \`list\`
-    autoSwitching: boolean
-    # whether automatically switch the source to
-      the first available one of a book when \`book_fetch\`
-    list: object
-        [source]: object
+    autoSwitching: boolean <- book_fetch
+    # whether automatically switch the source to the first available one of a book
+    list
+        [source]
             url: string
-            matcher: object
-                [matcher]: object
+            matcher
+                [matcher]
                     necessary: boolean
                     from: string
                     regexp: regexp
             replacer: array
-                [index]: array
+                []: array
                     0: string
                     1: string
             matchKeyInAround: regexp
 
-history: object
+history <- history*
     on: boolean
+    # whether to store commands to history
     loadToInteractive: integer
+    # how much commands to load to interactive-mode history
+
+hooks: array
+    []
+        on: boolean <- hook_toggle
+        name: string
+        event: array
+            []: string
+            # when to trigger this hook
+        action: array
+            []: string
+            # a whole command, can be interactive
 
 RELAVANT
 
@@ -203,6 +221,9 @@ RELAVANT
 ?config_reset        ~~
 ?config_edit         ~~
 `
+	.replace(/(?<=: )[a-z]+/g, s => Hili(s))
+	.replace(/(?<=^ *)[a-zA-Z\[\]]+/gm, Bold)
+	.replace(/(?<=# ).+$/gm, s => Hili(s, 3))
 }
 
 const cmd = {}
@@ -469,17 +490,17 @@ cmd.g = {
 		Log(`Done.`)
 		Div("EOF", 1, 1)
 	},
-	config_reset: async(_path) => {
+	config_reset: async(_bang, _path) => {
 		Div("config reset", 0, 2)
 
-		if (! _path) {
+		if (! _path && ! _bang) {
 			Warn("The default setting will be restored in 5 seconds.")
 			await sleep(5000)
 		}
 
 		Log("Reseting.")
 		
-		if (_path && _path !== "!") {
+		if (_path) {
 			const dft = objectPath(c_dft.setting, _path, false)
 			objectPath(c.setting, _path, true, dft)
 			Log("\n%o\n", dft)
@@ -551,7 +572,7 @@ cmd.g = {
 
 	interactive: async() => {
 		if (flag.interactive) {
-			Warn("Already in interactive mode.")
+			Warn("Already in interactive-mode.")
 			rln.prompt()
 			return
 		}
@@ -563,7 +584,7 @@ cmd.g = {
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			completer: interactive_completer,
+			completer: c.setting?.interactive?.allowComplete ? interactive_completer : undefined,
 			removeHistoryDuplicates: true
 		})
 		rln.rePrompt = () => rln.setPrompt(exT(c.setting?.interactive?.prompt, { hili: s => Hili(s) }))
@@ -639,8 +660,8 @@ cmd.i = {
 		rln.close()
 		process.exit(0)
 	},
-	clear: async(_force) => {
-		if (_force === "!")
+	clear: async(_bang) => {
+		if (_bang === "!")
 			await execa.command(c.setting?.interactive?.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
@@ -679,7 +700,8 @@ const c_dft = {
 	  interactive: {
 	    prompt: "!{ hili | xbqg$ } ",
         forceClearCommand: "clear",
-        allowXbqgPrefix: true
+        allowXbqgPrefix: true,
+        allowComplete: true
 	  },
 	  pagewarner: {
 	    warnNum: 20,
@@ -882,7 +904,7 @@ const c_dft = {
 	          }
 	        },
             replacer: [
-              [ /天才一秒记住本站地址：[^]+$/, "" ],
+              [ /天才一秒记住本站地址：<a.+?<\/a>/, "" ],
               [ /<p style="font-size:16px;">[^]+$/, "" ],
               [ /转载请注明出处：<a.+?<\/a>/, "" ],
               [ /\S+?提示您：看后求收藏.+?，接着再看更方便。/, "" ],
@@ -1030,7 +1052,7 @@ const wargs = (name) => ({
 	},
 	trigger(event, ...A) {
 		if (! Is.arr(event)) event = [ event ]
-		if (flag.debug) Log(Hili("xbqg% ") + `trigger ${ event.join(", ") }`)
+		if (flag.debug) Debug(`trigger ${ event.join(", ") }`)
 		return Promise.all(event
 			.filter(e => this._hook[e])
 			.map(e =>
@@ -1077,7 +1099,7 @@ const wargs = (name) => ({
 				}
 
 				[ opt_n, [ , [ opt_t, opt_m ] ] ] = o
-				if (bang && opt_t !== "boolean") return this._wrong("illegal_bang", opt_n)
+				if (bang && opt_t !== "boolean") return this._wrong("illegal_option_bang", opt_n)
 
 				if ([ "null", "boolean" ].includes(opt_t))
 					this.o[opt_n] = bang ? ! this.o[opt_n] : true
@@ -1107,6 +1129,7 @@ const wargs = (name) => ({
 					if (! arg_i_now) return this._wrong("too_many_args", cmd_n)
 					if (arg_i_now.endsWith("_")) arg_res = arg.length
 				}
+				if (arg_i === "_bang" && ! (tk = tk === "!")) i --
 				arg.push(tk)
 				break
 			}
@@ -1133,7 +1156,7 @@ cli.g = wargs("g")
 			too_many_args: cmd_n => `Too many arguments for \`${cmd_n}\`. Use \`help ${cmd_n}\` to get usage.`,
 			too_few_args: (cmd_n, req) => `Too few arguments for \`${cmd_n}\`, required ${req}. `
 				+ `Use \`help ${cmd_n}\` to get usage.`,
-			illegal_bang: opt_n => `Option \`${opt_n}\` is not a boolean one, so it cannot have a bang \`!\``
+			illegal_option_bang: opt_n => `Option \`${opt_n}\` is not a boolean one, so it cannot have a bang \`!\``
 		}
 	})
 	.help({ themes: info.t, extra: `
@@ -1199,7 +1222,7 @@ cli.i = wargs("i")
 cli.parse_ln = async ln =>
 	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
 
-// :: Ugly IIAFE
+// :: Goodbye
 
-; (async() => await cli.g.parse())()
+cli.g.parse()
 
