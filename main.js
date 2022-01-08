@@ -10,22 +10,20 @@ const open			= require("open")
 const readline		= require("readline")
 const {
 	Is, Cc, ski,
-	sleep, httpx, exTemplate: exT, serialize,
+	sleep, httpx, exTemplate: ext, serialize,
 	Logger
 }					= require("fkutil")
-const Debug			= (...msg) => flag.debug && Log(Hili("xbqg% "), ...msg)
 
-const logger		= Logger({ noColor: false }).bind(), {
-	warn: Warn, errEOF: Err, log: Log, div: Div,
-	exTemplateLog: exTLog, hili: Hili, bold: Bold, table: Table
-} = logger
+const l				= Logger({ noColor: false }).bind()
+l.debug				= (...msg) => flag.debug && l.log(l.hili("xbqg% "), ...msg)
+
 const std			= {
 	stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
 }
 
 // :: Tool
 
-const objectPath = (obj, path, create, val) => {	
+const objectPath = (obj, path, create, val) => {
 	if (! path.match(/^[.[]/)) path = "." + path
 
 	const rsit = path.matchAll(/\.([_a-zA-Z][0-9_a-zA-Z]*)|\[(\d+)]/g)
@@ -43,14 +41,14 @@ const objectPath = (obj, path, create, val) => {
 
 		if (Is.objR(o)) {
 			if (t ^ Is.arr(o)) ;
-			else if (create) Err("Path type conflicted.")
+			else if (create) l.err("Path type conflicted.")
 		}
 
 		else if (Is.udf(o)) {
 			if (create) o = pa_o[pa_k] = t ? {} : []
-			else Err("Path includes undefined.")
+			else l.err("Path includes undefined.")
 		}
-		else if (create) Err("Path type conflicted.")
+		else if (create) l.err("Path type conflicted.")
 
 		pa_o = o
 		o = o[k]
@@ -67,7 +65,7 @@ const objectPath = (obj, path, create, val) => {
 const c = {
 	read: (n, force) => {
 		if (force && c[n]) return c[n]
-		Debug(`read ${n}`)
+		l.debug(`read ${n}`)
 		return c[n] = JSON.parse(fs.readFileSync(p_file(n), "utf8").toString())
 	},
 	read_json: n => fs.readFileSync(p_file(n), "utf8").toString(),
@@ -78,7 +76,7 @@ const c = {
 				? c[n]
 				: serialize(c[n], { regexp: true, indent: 2 })
 			)), "utf8")
-		Debug(`write ${n}`)
+		l.debug(`write ${n}`)
 	}
 }
 
@@ -93,42 +91,43 @@ const p_file = n => `${p_data}/${n}.json`
 
 const info = {}
 info.g = {
-	fetch:				[ [ "f",	"."		], [ "Fetch a page by specific `page` id." ] ],
-	source:				[ [ "s",	".="	], [ "Modify the active `source`. Prefix matching is OK.",
-												 "Show the active `source` when no argument is given." ] ],
-	fetch_prev:			[ [ "p",	"["		], [ "Fetch the `prev`ious page." ] ],
-	fetch_curr:			[ [ "c",	"="		], [ "Fetch the `curr`ent page." ] ],
-	fetch_next:			[ [ "n",	"]"		], [ "Fetch the `next` page." ] ],
-	around:				[ [ "a",	"-"		], [ "Show `around` information,",
-												 "i.e. current title and `page` id of `prev`, `curr`, `next`." ] ],
-	book_show:			[ [ "bs",	"@-"	], [ "Show your `bookcase`." ] ],
-	book_mark:			[ [ "bm",	"@+"	], [ "Add the current page to your `bookcase` and give it a `name`.",
-												 "Update when the book `name` already exists." ] ],
-	book_fetch:			[ [ "b",	"@"		], [ "Fetch the page you read before of a named book in your `bookcase`.",
+	fetch:				[ [ "f",	"."		], [ "Fetch a page by specific <page> id." ] ],
+	source:				[ [ "s",	".="	], [ "Modify the active [source]. Prefix matching is OK.",
+												 "Show the active source when no argument is given." ] ],
+	fetch_prev:			[ [ "p",	"["		], [ "Fetch the <prev>ious page." ] ],
+	fetch_curr:			[ [ "c",	"="		], [ "Fetch the <curr>ent page." ] ],
+	fetch_next:			[ [ "n",	"]"		], [ "Fetch the <next> page." ] ],
+	around:				[ [ "a",	"-"		], [ "Show around information,",
+												 "i.e. current title and page id of prev, curr, next." ] ],
+	book_show:			[ [ "bs",	"@-"	], [ "Show your bookcase." ] ],
+	book_mark:			[ [ "bm",	"@+"	], [ "Add the current page to your bookcase and give it a <name>.",
+												 "Update when the book already exists." ] ],
+	book_remove:		[ [ "br",	"@="	], [ "Remove a <name>d book." ] ],
+	book_fetch:			[ [ "b",	"@"		], [ "Fetch the page you read before of a <name>d book in your bookcase.",
 												 "Prefix matching is OK." ] ],
 	book_browse:		[ [ "bb",	"@!"	], [ "Open the current page in your browser" ] ],
 	config:				[ [ "c",	"%"		], [ "Print the whole configuration when no arguments is given.",
-												 "Print a specific item by the given `JSON path`.",
-												 "e.g. `xbqg c a.b[42].c`",
+												 "Print a specific item by the given JSON <path>.",
+												 "e.g. `config a.b[42].c`",
 												 "Delete the specific item.",
-												 "e.g. `xbqg c i.dont.want.it -` or `xbqg c me.too undefined`",
-												 "Modify the specific item. Argument `=` turns the `value` into a string.",
-												 "e.g. `xbqg c a.boolean true` and",
-												 "     `xbqg c a.string = true` or `xbqg c a.string \\\"true\\\"`" ] ],
-	config_edit:		[ [ "ce",	"%!"	], [ "Edit a configuration JSON file by your %`editor`.",
+												 "e.g. `config i.dont.want.it undefined` or `config me.too /`",
+												 "Modify the specific item. When <action> is `=`, <value> is string.",
+												 "e.g. `config a.boolean true` and",
+												 "     `config a.string = true` or `config a.string \\\"true\\\"`" ] ],
+	config_edit:		[ [ "ce",	"%!"	], [ "Edit a configuration JSON [file] by your %editor.",
 												 "In default, `setting.json`." ] ],
 	config_reset:		[ [ "cr",	"%="	], [ "Reset your configuration to the default in 5 seconds.",
-												 "The task is immediately done when `path` is `!`.",
-												 "Just reset the specific `path` of the configuration without delaying." ] ],
-	pagewarner_stat:	[ [ "ps",	"^"		], [ "Show today's `pagewarner` information using a progress bar." ] ],
-	pagewarner_diff:	[ [ "pd",	"^-"	], [ "Show `pagewarner` difference among days using a bar chart." ] ],
-	interactive:		[ [ "i",	"!"		], [ "Enter the `interactive` mode." ] ],
+												 "The task is immediately done when `!` is given.",
+												 "Just reset the specific <path> of the configuration without delaying." ] ],
+	pagewarner_stat:	[ [ "ps",	"^"		], [ "Show today's pagewarner information using a progress bar." ] ],
+	pagewarner_diff:	[ [ "pd",	"^-"	], [ "Show pagewarner difference among days using a bar chart." ] ],
+	interactive:		[ [ "i",	"!"		], [ "Enter nteractive-mode." ] ],
 	history:			[ [ "hi",	"~"		], [ "Show history." ] ],
 	history_reset:		[ [ "hr",	"~="	], [ "Reset history." ] ],
-	hook:				[ [ "k",	"/"		], [ "Trigger a `name`d hook manually." ] ],
+	hook:				[ [ "k",	"/"		], [ "Trigger a <name>d hook manually." ] ],
 	hook_show:			[ [ "ks",	"/-"	], [ "Show your hooks." ] ],
-	hook_toggle:		[ [ "kt",	"/="	], [ "Toggle a `name`d hook." ] ],
-	help:				[ [ "h",	"?"		], [ "Show help of the given `theme` or `command name`.",
+	hook_toggle:		[ [ "kt",	"/="	], [ "Toggle a <name>d hook." ] ],
+	help:				[ [ "h",	"?"		], [ "Show help of the given <theme> or command name.",
 												 "Show usage when no arguments is given."] ],
 }
 info.i = {
@@ -136,7 +135,7 @@ info.i = {
 	clear:		[ [ "c",	"-" ], [ "Clear the console." ] ],
 	eval:		[ [ "v",	"+"	], [ "Run Javascript code." ] ],
 	shell:		[ [ "s",	"$"	], [ "Run command in shell." ] ],
-	help:		[ [ "h",	"?" ], [ "Show help of the given `theme` or `command name`." ] ],
+	help:		[ [ "h",	"?" ], [ "Show help of the given <theme> or command name." ] ],
 }
 info.t = {
 	data: `
@@ -221,14 +220,14 @@ RELAVANT
 ?config_reset        ~~
 ?config_edit         ~~
 `
-	.replace(/(?<=: )[a-z]+/g, s => Hili(s))
-	.replace(/(?<=^ *)[a-zA-Z\[\]]+/gm, Bold)
-	.replace(/(?<=# ).+$/gm, s => Hili(s, 3))
+	.replace(/(?<=: )[a-z]+/g, s => l.hili(s))
+	.replace(/(?<=^ *)[a-zA-Z\[\]]+/gm, l.bold)
+	.replace(/(?<=# ).+$/gm, s => l.hili(s, 3))
 }
 
 const cmd = {}
 const fetch_alias = name => async() => {
-	Div("page info", 0, 1)
+	l.div("page info", 0, 1)
 
 	c.read("around")
 	const page = c.around[c.setting?.source?.active]?.[name]
@@ -240,12 +239,12 @@ const fetch_alias = name => async() => {
 		else c.pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
 		c.write("pagewarner")
 
-		Log(`${name}: ${page}`)
+		l.log(`${name}: ${page}`)
 		await cmd.g.fetch(page)
 	}
 	else {
-		Log(`${name}: null`)
-		Div("EOF", 0, 1)
+		l.log(`${name}: null`)
+		l.div("EOF", 0, 1)
 	}
 }
 const history_save = ln => {
@@ -272,8 +271,8 @@ const interactive_completer = ln => {
 
 cmd.g = {
 	fetch: async(page) => {
-		Div("fetch", 0, 2)
-		if (! page) Err("Page can't be null.")
+		l.div("fetch", 0, 2)
+		if (! page) l.err("Page can't be null.")
 
 		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
 		const g = c.setting?.source?.list?.global
@@ -282,12 +281,12 @@ cmd.g = {
 		const blocks = {}
 
 		try {
-			blocks.html = await httpx.get(exT(src.url, { page }),
+			blocks.html = await httpx.get(ext(src.url, { page }),
 				{ headers: { "User-Agent": "xbqg/" + version } }
 			)
 		}
 		catch (err) {
-			if (Is.num(err)) Log("Unexpected response code " + err + "." + ski(
+			if (Is.num(err)) l.log("Unexpected response code " + err + "." + ski(
 				err, {
 					404: " Perhaps the given page is wrong.",
 					502: " Perhaps the server go wrong. You may switch the source.",
@@ -295,34 +294,34 @@ cmd.g = {
 					504: ski.q(503)
 				}, "")
 			)
-			else Err(err?.message ?? err)
+			else l.err(err?.message ?? err)
 		}
 
 		for (let i in matcher) {
 			const m = matcher[i]
 			blocks[i] = blocks[m.from]?.match(RegExp(m.regexp))?.[m.group ?? 1]
 			if (m.necessary && ! blocks[i])
-				Log(blocks), Err(`Block "${i}" mismatched.\nsource name: "${s}"`)
+				l.log(blocks), l.err(`Block "${i}" mismatched.\nsource name: "${s}"`)
 		}
 
 		for (let r of replacer)
 			blocks.content = blocks.content.replace(RegExp(r[0], "g"), r[1])
 
 		if (blocks.title.match(/^[3-5][01]\d+/))
-			Err(`HTTP error code: ${blocks.title}`)
+			l.err(`HTTP error code: ${blocks.title}`)
 
 		const chapterTitle = blocks.chapterName + " @ " + blocks.bookName
-		Log(chapterTitle)
-		Log(blocks.content)
+		l.log(chapterTitle)
+		l.log(blocks.content)
 
-		Div("around", 1, 1)
+		l.div("around", 1, 1)
 
 		const a = {
 			prev: blocks.prev,
 			curr: page,
 			next: blocks.next
 		}
-		Log(JSON.stringify(a, null, 2))
+		l.log(JSON.stringify(a, null, 2))
 
 		c.read("around")
 		a.title = chapterTitle
@@ -331,24 +330,24 @@ cmd.g = {
 
 		c.write("around")
 
-		Div("EOF", 1, 1)
+		l.div("EOF", 1, 1)
 	},
 	fetch_prev: fetch_alias("prev"),
 	fetch_curr: fetch_alias("curr"),
 	fetch_next: fetch_alias("next"),
 
 	around: () => {
-		Div("around", 0, 2)
+		l.div("around", 0, 2)
 
 		c.read("around")
-		Log(c.around[c.setting?.source?.active])
+		l.log(c.around[c.setting?.source?.active])
 
-		Div("EOF", 1, 1)
+		l.div("EOF", 1, 1)
 	},
-	
+
 	source: (_src) => {
 		if (_src) {
-			Div("source switch", 0, 1)
+			l.div("source switch", 0, 1)
 
 			_src = Object.keys(c.setting?.source?.list)?.find(n => n !== "global" && n?.startsWith(_src))
 			
@@ -356,28 +355,26 @@ cmd.g = {
 				c.setting.source.active = _src
 
 				c.write("setting")
-				Log(`Switching source to \`${_src}\`.`)
+				l.log(`Switching source to \`${_src}\`.`)
 			}
-			else Warn("Not found.")
+			else l.warn("Not found.")
 
-			Div("EOF", 0, 1)
+			l.div("EOF", 0, 1)
 		}
 		else {
-			Div("source active", 0, 1)
-			Log(c.setting?.source?.active)
-			Div("EOF", 0, 1)
+			l.div("source active", 0, 1)
+			l.log(c.setting?.source?.active)
+			l.div("EOF", 0, 1)
 		}
 	},
 
 	book_show: () => {
-		Div("book show", 0, 2)
+		l.div("book show", 0, 2)
 		// TODO: better display
-		Log(c.read("books"))
-		Div("EOF", 1, 1)
+		l.log(c.read("books"))
+		l.div("EOF", 1, 1)
 	},
-	book_mark: (_name) => {
-		Div("book mark", 0, 2)
-
+	book_mark: (_bang, _name) => {
 		c.read("around")
 		c.read("books")
 
@@ -385,9 +382,13 @@ cmd.g = {
 		const re = RegExp(c.setting?.source?.list[s]?.matchKeyInAround)
 		const key = c.around[s]?.curr.match(re)[1]
 
-		if (! key) Err("No around is found.")
+		if (! key)
+			if (! _bang) l.err("No around is found.")
+			else return
 
-		let newBook = true
+		l.div("book mark", 0, 2)
+
+		let newBook = false
 		for (let i in c.books)
 			if (c.books[i][s]?.curr.match(re)[1] === key) {
 				newBook = false
@@ -395,90 +396,95 @@ cmd.g = {
 			}
 
 		if (newBook && ! _name)
-			Err("Book name can't be null when adding new book.")
+			l.err("Book name can't be null when adding new book.")
 		if (! c.books[_name]) c.books[_name] = {}
 		c.books[_name][s] = c.around[s]
 
 		c.write("books", c.books)
-		Log(newBook ? "Added." : "Updated.")
-		Div("EOF", 1, 1)
+		l.log(newBook ? "Added." : "Updated.")
+		l.div("EOF", 1, 1)
+	},
+	book_remove: (name) => {
+		l.div("book remove")
 	},
 	book_fetch: async(name) => {
-		Div("book fetch", 0, 1)
+		l.div("book fetch", 0, 1)
 
-		if (! name) Err("Book name can't be null.")
+		if (! name) l.err("Book name can't be null.")
 		c.read("books")
 
 		name = Object.keys(c.books).find(n => n.startsWith(name))
-		const a = c.books[name]
-		let s = c.setting?.source?.active
-		if (a?.[s]) ;
-		else if (c.setting?.source?.autoSwitching) {
-			c.setting.source.active = s = Object?.keys(a)[0]
-			Log(`Auto switching source to \`${s}\`.`)
-			c.write("setting")
+
+		if (name) {
+			const a = c.books[name]
+			let s = c.setting?.source?.active
+			if (! a[s] && c.setting?.source?.autoSwitching) {
+				c.setting.source.active = s = Object.keys(a ?? {})[0]
+				l.log(`Auto switching source to \`${s}\`.`)
+				c.write("setting")
+			}
+			l.log(`Fetching book \`${name}\`.`)
+			await cmd.g.fetch(a[s].curr)
 		}
 		else {
-			Warn("Not found.")
-			Div("EOF", 0, 1)
+			l.warn("Not found.")
+			l.div("EOF", 0, 1)
 			return
 		}
-		Log(`Fetching book \`${name}\`.`)
-		await cmd.g.fetch(a[s].curr)
 	},
 	book_browse: () => {
-		Div("book browse", 0, 2)
+		l.div("book browse", 0, 2)
 
 		c.read("around")
 
 		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
 		const browser = c.setting?.browser
 
-		if (! c.around[s]) Warn("Not found.")
+		if (! c.around[s]) l.warn("Not found.")
 
 		else {
-			const url = exT(src.url, { page: c.around[s].curr })
-			Log("Running " + Hili(`${browser ?? "browser"} ${url}`))
+			const url = ext(src.url, { page: c.around[s].curr })
+			l.log("Running " + l.hili(`${browser ?? "browser"} ${url}`))
 			open(url, { app: { name: browser } })
 
-			Log("Done.")
+			l.log("Done.")
 		}
-		Div("EOF", 1, 1)
+		l.div("EOF", 1, 1)
 	},
 
 	config: (_path, _action, _val_) => {
 		if (! _path) {
-			Div("config read all", 0, 2)
-			Log(c.setting)
-			Div("EOF", 1, 1)
+			l.div("config read all", 0, 2)
+			l.log(c.setting)
+			l.div("EOF", 1, 1)
 		}
 		else {
 			const create = !! _action
-			Div(create ? "config write" : "config read", 0, 2)
+			l.div(create ? "config write" : "config read", 0, 2)
 
 			let val; try {
-				val = [ "undefined", "-" ].includes(_action + "")
+				val = [ "undefined", "/" ].includes(_action + "")
 					? undefined
 					: JSON.parse(_action === "=" ? `"${ _val_.join(" ") }"` : _action)
 			}
 			catch {
-				Err("Illegal JSON value.")
+				l.err("Illegal JSON value.")
 			}
 
 			const r = objectPath(c.setting, _path, create, val)
 
 			c.write("setting", c.setting)
-			Log(r)
+			l.log(r)
 
-			Div("EOF", 1, 1)
+			l.div("EOF", 1, 1)
 		}
 	},
 	config_edit: async(_file) => {
 		const path = p_data + "/" + (_file ?? "setting") + ".json"
-		const editor = exT(c.setting?.editor, { path })
+		const editor = ext(c.setting?.editor, { path })
 
-		Div("config edit", 0, 2)
-		Log("Running " + Hili("$ " + editor))
+		l.div("config edit", 0, 2)
+		l.log("Running " + l.hili("$ " + editor))
 
 		try {
 			if (flag.interactive) rln.pause()
@@ -487,31 +493,31 @@ cmd.g = {
 		}
 		catch {}
 
-		Log(`Done.`)
-		Div("EOF", 1, 1)
+		l.log(`Done.`)
+		l.div("EOF", 1, 1)
 	},
 	config_reset: async(_bang, _path) => {
-		Div("config reset", 0, 2)
+		l.div("config reset", 0, 2)
 
 		if (! _path && ! _bang) {
-			Warn("The default setting will be restored in 5 seconds.")
+			l.warn("The default setting will be restored in 5 seconds.")
 			await sleep(5000)
 		}
 
-		Log("Reseting.")
-		
+		l.log("Reseting.")
+
 		if (_path) {
 			const dft = objectPath(c_dft.setting, _path, false)
 			objectPath(c.setting, _path, true, dft)
-			Log("\n%o\n", dft)
+			l.log("\n%o\n", dft)
 			c.write("setting")
 		}
 
 		else {
 			c.write("setting", c_dft.setting)
 		}
-		Log("Done.")
-		Div("EOF", 1, 1)
+		l.log("Done.")
+		l.div("EOF", 1, 1)
 	},
 
 	pagewarner_stat: () => {
@@ -520,66 +526,66 @@ cmd.g = {
 		const today = new Date().format("yyyymmdd")
 		const n = c.pagewarner[today] ?? 0, m = c.setting?.pagewarner?.warnNum
 
-		Div("pagewarner stat", 0, 2)
+		l.div("pagewarner stat", 0, 2)
 		if (n <= m) {
 			if (c.setting?.pagewarner?.onlyWarnAfterFetching === true) return
 
-			Log(`Reading progress today: [${n} / ${m}]`)
-			Log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
-			const l = c.setting?.pagewarner?.progressStyle?.stat?.length
-			let nc = parseInt(n / m * l)
+			l.log(`Reading progress today: [${n} / ${m}]`)
+			l.log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
+			const L = c.setting?.pagewarner?.progressStyle?.stat?.length
+			let nc = parseInt(n / m * L)
 			if (nc < 0) nc = 0
-			exTLog(
+			l.extlog(
 				c.setting?.pagewarner?.progressStyle?.stat?.fommat,
 				"setting.pagewarner.progressStyle.stat.fommat", {
 					progress: ($, f, b) =>
-						Hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
-						Cc(b, $.param(1, "back")).char().r.repeat(l - nc),
+						l.hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
+						Cc(b, $.param(1, "back")).char().r.repeat(L - nc),
 					percent: (n / m).toPercent()
 				}
 			)
 		}
 		else {
-			Warn(`Reading progress today: [${n} / ${m}]`)
-			Warn(`${n - m} page${m - n <= 1 ? "" : "s"} more than the warning num!`)
-			Warn("Suggestion: stop now!")
+			l.warn(`Reading progress today: [${n} / ${m}]`)
+			l.warn(`${n - m} page${m - n <= 1 ? "" : "s"} more than the warning num!`)
+			l.warn("Suggestion: stop now!")
 		}
-		Div("EOF", 1, 1)
+		l.div("EOF", 1, 1)
 	},
 	pagewarner_diff: () => {
 		c.pagewarner = c.read("pagewarner")
 
-		Div("pagewarner diff", 0, 2)
+		l.div("pagewarner diff", 0, 2)
 
 		const l = c.setting?.pagewarner?.progressStyle?.diff?.length
 		let m = l; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
 
 		for (let d in c.pagewarner) {
 			const n = c.pagewarner[d]
-			exTLog(
+			l.extlog(
 				c.setting?.pagewarner?.progressStyle?.diff?.fommat,
 				"setting.pagewarner.progressStyle.diff.fommat", {
 					date: d,
 					progress: (_, f) =>
-						Hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * l)),
+						l.hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * l)),
 					number: n
 				}
 			)
 		}
 
-		Div("EOF", 1, 1)
+		l.div("EOF", 1, 1)
 	},
 
 	interactive: async() => {
 		if (flag.interactive) {
-			Warn("Already in interactive-mode.")
+			l.warn("Already in interactive-mode.")
 			rln.prompt()
 			return
 		}
 
-		Div("interactive", 0, 2)
-		Log("Use `!help` to get usage of interactive instructions.")
-		
+		l.div("interactive", 0, 2)
+		l.log("Use `!help` to get usage of interactive instructions.")
+
 		flag.interactive = true
 		rln = readline.createInterface({
 			input: process.stdin,
@@ -587,8 +593,8 @@ cmd.g = {
 			completer: c.setting?.interactive?.allowComplete ? interactive_completer : undefined,
 			removeHistoryDuplicates: true
 		})
-		rln.rePrompt = () => rln.setPrompt(exT(c.setting?.interactive?.prompt, { hili: s => Hili(s) }))
-		
+		rln.rePrompt = () => rln.setPrompt(ext(c.setting?.interactive?.prompt, { hili: s => l.hili(s) }))
+
 		let n = c.setting?.history?.loadToInteractive
 		if (n) {
 			c.read("history")
@@ -609,50 +615,50 @@ cmd.g = {
 
 			rln.prompt()
 		})
-		rln.on("close", () => Div("EOI", 2, 1))
+		rln.on("close", () => l.div("EOI", 2, 1))
 	},
 
 	history: () => {
-		Div("history show", 0, 2)
+		l.div("history show", 0, 2)
 		c.read("history")
-		Log(c.history.join("\n"))
-		Div("EOF", 1, 1)
+		l.log(c.history.join("\n"))
+		l.div("EOF", 1, 1)
 	},
 	history_reset: () => {
-		Div("history reset", 0, 2)
+		l.div("history reset", 0, 2)
 
-		Log("Reseting.")
+		l.log("Reseting.")
 		c.write("history", c_dft.history)
-		Log("Done.")
-		Div("EOF", 1, 1)
+		l.log("Done.")
+		l.div("EOF", 1, 1)
 	},
 
 	hook: async(name) => {
-		Div("hook execute", 0, 1)
+		l.div("hook execute", 0, 1)
 
 		await cli.g._hook._execute(cli.g._hook._find(name))
 
-		Div("EOH", 0, 1)
+		l.div("EOH", 0, 1)
 	},
 	hook_show: () => {
-		Div("hook show", 0, 2)
+		l.div("hook show", 0, 2)
 
-		Log(c.setting?.hooks)
+		l.log(c.setting?.hooks)
 
-		Div("EOF", 1, 1)
+		l.div("EOF", 1, 1)
 	},
 	hook_toggle: (name) => {
-		Div("hook toggle", 0, 1)
+		l.div("hook toggle", 0, 1)
 		
 		const h =  cli.g._hook._find(name)
-		if (! h) Warn("Not found.")
+		if (! h) l.warn("Not found.")
 		else {
 			h.on = ! h.on
 			c.write("setting")
 			
-			Log(h.on ? "Enabled." : "Disabled.")
+			l.log(h.on ? "Enabled." : "Disabled.")
 		}
-		Div("EOF", 0, 1)
+		l.div("EOF", 0, 1)
 	}
 }
 cmd.i = {
@@ -666,22 +672,22 @@ cmd.i = {
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
 	eval: (code_) => {
-		Div("evaluate", 0, 1)
+		l.div("evaluate", 0, 1)
 		try {
-			Log(eval(code_.join(" ")))
+			l.log(eval(code_.join(" ")))
 		}
 		catch (e) {
-			Warn(e)
+			l.warn(e)
 		}
-		Div("EOF", 0, 1)
+		l.div("EOF", 0, 1)
 	},
 	shell: async(code_) => {
-		Div("shell", 0, 1)
+		l.div("shell", 0, 1)
 		try {
 			await execa.command(code_.join(" "), std)
 		}
 		catch {}
-		Div("EOF", 0, 1)
+		l.div("EOF", 0, 1)
 	}
 }
 
@@ -875,7 +881,7 @@ const c_dft = {
 	        matchKeyInAround: /(.*)\//
 	      },
           "tvbts": {
-            url: "http://www.tvbts.com/${page}.html",
+            url: "https://www.tvbts.com/${page}.html",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -911,6 +917,36 @@ const c_dft = {
               [ /《\S+?》来源：<a.+?<\/a>/, "" ]
             ],
 	        matchKeyInAround: /(.*)\//
+          },
+          "bookben": {
+            url: "https://www.bookben.net/read/${page}.html",
+	        matcher: {
+	          bookName: {
+	            necessary: true,
+	            from: "title",
+	            regexp: /^(.+?)_/
+	          },
+	          chapterName: {
+	            necessary: true,
+	            from: "title",
+	            regexp: /^(.+?)_(.+)_书本网/
+	          },
+	          content: {
+	            necessary: true,
+	            from: "html",
+	            regexp: /<div id="booktxt">([^]+?)<\/div>/
+	          },
+	          prev: {
+	            necessary: false,
+	            from: "html",
+	            regexp: /<a id="prev_url" href="\/read\/([0-9\/])+.html" class="block">/
+	          },
+	          next: {
+	            necessary: false,
+	            from: "html",
+	            regexp: /<a id="next_url" href="\/read\/([0-9\/])+.html" class="block">/
+	          }
+	        }
           }
 	    }
 	  },
@@ -941,7 +977,7 @@ const c_dft = {
           name: "auto-bookmark",
           event: [ "pre-book_fetch" ],
           action: [
-            "book_mark"
+            "book_mark !"
           ]
         }
       ]
@@ -988,31 +1024,31 @@ const wargs = (name) => ({
 	},
 	help({ themes, extra } = {}) {
 		this.cmd.help = (_theme) => {
-			Div("help", 0, 2)
+			l.div("help", 0, 2)
 
 			let ext, txt = ""
 			const cmd_head = (k, v) => [
-				[ k, ...v[0] ].map(Hili).join(" | "),
+				[ k, ...v[0] ].map(s => l.hili(s)).join(" | "),
 				v[3].map(o => {
 					const n = o.replace(/_$/, "...")
 					return n[0] === "_"
-						? "[" + Hili(n.slice(1)) + "]"
-						: "<" + Hili(n) + ">"
+						? "[" + l.hili(n.slice(1)) + "]"
+						: "<" + l.hili(n) + ">"
 				}).join(" ")
 			]
 
 			if (! _theme) {
 				if (this.has_option) txt = "OPTIONS\n\n"
-					+ Table(Object.entries(this.opt).map(([ k, v ]) => {
+					+ l.table(Object.entries(this.opt).map(([ k, v ]) => {
 						const bool = v[1][0] === "boolean"
 						return [
-							"--" + Hili(k) +  " | -" + Hili(v[0]) + (bool ? `[${ Hili("!") }]` : ""),
+							"--" + l.hili(k) +  " | -" + l.hili(v[0]) + (bool ? `[${ l.hili("!") }]` : ""),
 							v[2] + (bool ? ", toggle with a bang `!`." : "")
 						]
 					}), [ 25 ])
 					+ "\n\n"
 				txt	+= "COMMANDS\n\n"
-					+ Table(
+					+ l.table(
 						Object.entries(this.info).map(([ k, v ]) => {
 							const tab = [ cmd_head(k, v) ]
 							for (let i in v[1]) {
@@ -1030,12 +1066,12 @@ const wargs = (name) => ({
 			else {
 				let e = this._find_cmd(_theme)
 				if (e) txt = "COMMAND\n\n" + cmd_head(...e).join(" ") + "\n" + e[1][1].join("\n")
-				else Warn("Unknown command or theme.")
+				else l.warn("Unknown command or theme.")
 			}
 
-			Log(txt.replace(/(^|\n)[A-Z]+\n/g, Bold))
-			Div("EOF", 1, 1)
-			
+			l.log(txt.replace(/(^|\n)[A-Z]+\n/g, l.bold))
+			l.div("EOF", 1, 1)
+
 			if (! flag.interactive) process.exit(0)
 		}
 		this._init_cmd([ "help" ])
@@ -1047,12 +1083,12 @@ const wargs = (name) => ({
 		_execute: async h => {
 			if (! h) return
 			if (flag.interactive || ! h?.interactive)
-			for (let ln of h.action) await cli.parse_ln(ln)
+				for (let ln of h.action) await cli.parse_ln(ln, true)
 		}
 	},
 	trigger(event, ...A) {
 		if (! Is.arr(event)) event = [ event ]
-		if (flag.debug) Debug(`trigger ${ event.join(", ") }`)
+		if (flag.debug) l.debug(`trigger ${ event.join(", ") }`)
 		return Promise.all(event
 			.filter(e => this._hook[e])
 			.map(e =>
@@ -1072,15 +1108,15 @@ const wargs = (name) => ({
 	},
 	_wrong(sit, ...A) {
 		const s = this.wrong_usage[sit](...A)
-		if (flag.interactive) Warn(s)
+		if (flag.interactive) l.warn(s)
 		else {
-			Div("wrong usage", 0, 2)
-			Err(s)
+			l.div("wrong usage", 0, 2)
+			l.err(s)
 		}
 		return this
 	},
 	o: {},
-	async parse(raw) {
+	async parse(raw, is_hook) {
 		if (! raw?.length) raw = process.argv.slice(2)
 
 		let mod = this.opt ? "opt" : "cmd",
@@ -1135,11 +1171,12 @@ const wargs = (name) => ({
 			}
 		}
 
-		if (arg.length < arg_i.req) return this._wrong("too_few_args", cmd_n, arg_i.req)
-
-		if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
-		if (! flag.interactive) cmd_n ??= "help"
-		await this.trigger("run", cmd_n, raw)
+		if (! flag.interactive && ! cmd_n) cmd_n = "help"
+		else {
+			if (arg.length < arg_i.req) return this._wrong("too_few_args", cmd_n, arg_i.req)
+			if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
+		}
+		if (! is_hook) await this.trigger("run", cmd_n, raw)
 		await this.cmd[cmd_n]?.(...arg)
 
 		return this
@@ -1174,22 +1211,22 @@ RELAVANT
 `		})
 	.hook("run", async(C, cmd, raw) => {
 		if (C.o.version) {
-			Log("xbqg " + version)
+			l.log("xbqg " + version)
 			process.exit(0)
 		}
 
-		logger.opt.noColor = flag.plain
+		l.opt.noColor = flag.plain
 		if (flag.interactive) rln.rePrompt()
 
 		if (flag.lauch) {
 			flag.lauch = false
-			
+
 			if (! (
 				p_data = C.p_data ?? process.env.XBQG_DATA?.replace(/\/$/, "")
 			)) {
 				if (cmd === "help") return
-				Div("lauch", 0, 2)
-				Err(
+				l.div("lauch", 0, 2)
+				l.err(
 					"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
 					"Or use `xbqg --path <p_data>` to assign it."
 				)
@@ -1219,8 +1256,8 @@ cli.i = wargs("i")
 	})
 	.help({ extra: "Interactive instruction starts with a bang \`!\`." })
 	.hook("run", (_, __, raw) => history_save("!" + raw.join(" ")))
-cli.parse_ln = async ln =>
-	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
+cli.parse_ln = async (ln, is_hook) =>
+	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "), is_hook)
 
 // :: Goodbye
 
