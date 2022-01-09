@@ -144,7 +144,7 @@ Filenames cannot be changed at present.
 
 RELAVANT
 
-?setting             -> one of the data files
+? setting             -> one of the data files
 `,
 	setting: `
 Since all formats of data become Javascript object when the script runs,
@@ -215,10 +215,10 @@ hooks: array
 
 RELAVANT
 
-?data                -> where to store
-?config              -> commands to operate the configuration
-?config_reset        ~~
-?config_edit         ~~
+? data                -> where to store
+? config              -> commands to operate the configuration
+? config_reset        ~~
+? config_edit         ~~
 `
 	.replace(/(?<=: )[a-z]+/g, s => l.hili(s))
 	.replace(/(?<=^ *)[a-zA-Z\[\]]+/gm, l.bold)
@@ -350,7 +350,7 @@ cmd.g = {
 			l.div("source switch", 0, 1)
 
 			_src = Object.keys(c.setting?.source?.list)?.find(n => n !== "global" && n?.startsWith(_src))
-			
+
 			if (_src) {
 				c.setting.source.active = _src
 
@@ -370,8 +370,14 @@ cmd.g = {
 
 	book_show: () => {
 		l.div("book show", 0, 2)
-		// TODO: better display
-		l.log(c.read("books"))
+		l.log(l.table(
+			Object.entries(c.read("books")).map(([ name, book ]) => (
+				Object.entries(book).map(([ src, { title, time } ], k) => (
+					[ k ? "" : l.bold(name), src, l.hili(title, 3), l.hili(String(time)) ]
+				))
+			)).flat(),
+			[ 10, 10, 60 ]
+		))
 		l.div("EOF", 1, 1)
 	},
 	book_mark: (_bang, _name) => {
@@ -1205,9 +1211,9 @@ Email                <fork_killet@qq.com>
 RELAVANT
 
 ?                    -> this
-!?                   -> interactive instructions
-?data                -> data files
-?setting             -> the configuration
+! ?                  -> interactive instructions
+? data               -> data files
+? setting            -> the configuration
 `		})
 	.hook("run", async(C, cmd, raw) => {
 		if (C.o.version) {
