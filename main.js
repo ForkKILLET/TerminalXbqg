@@ -563,8 +563,8 @@ cmd.g = {
 
 		l.div("pagewarner diff", 0, 2)
 
-		const l = c.setting?.pagewarner?.progressStyle?.diff?.length
-		let m = l; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
+		const L = c.setting?.pagewarner?.progressStyle?.diff?.length
+		let m = L; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
 
 		for (let d in c.pagewarner) {
 			const n = c.pagewarner[d]
@@ -573,7 +573,7 @@ cmd.g = {
 				"setting.pagewarner.progressStyle.diff.fommat", {
 					date: d,
 					progress: (_, f) =>
-						l.hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * l)),
+						l.hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * L)),
 					number: n
 				}
 			)
