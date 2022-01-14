@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.5.1"
+const version		= "4.6.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -10,11 +10,24 @@ const open			= require("open")
 const readline		= require("readline")
 const {
 	Is, Cc, ski,
-	sleep, httpx, exTemplate: ext, serialize,
+	sleep, httpx, exT: ext, serialize,
 	Logger
 }					= require("fkutil")
 
-const l				= Logger({ noColor: false }).bind()
+const l				= Logger({
+	noColor: false,
+	dftTem: {
+		black: (_, s) => l.hili(s, 0),
+		red: (_, s) => l.hili(s, 1),
+		green: (_, s) => l.hili(s),
+		yellow: (_, s) => l.hili(s, 3),
+		blue: (_, s) => l.hili(s, 4),
+		magenta: (_, s) => l.hili(s, 5),
+		cyan: (_, s) => l.hili(s, 6),
+		white: (_, s) => l.hili(s, 7),
+		bold: (_, s) => l.bold(s)
+	}
+}).bind()
 l.debug				= (...msg) => flag.debug && l.log(l.hili("xbqg% "), ...msg)
 
 const std			= {
@@ -153,6 +166,13 @@ Javascript style \`path\` is used below.
 editor: string <- config_edit
 # the editor for opening your data files
 
+browser: string <- book_browse
+# the browser for opening the current page
+
+around <- around
+	style
+		format: string
+
 interactive <- interactive
     prompt: string
     # what to display before your cursor in interactive-mode
@@ -172,10 +192,10 @@ pagewarner <- pagewarner*
     progressStyle
         stat <- pagewarner_stat
             length: integer
-            fommat: string
+            format: string
         diff <- pagewarner_diff
             length: integer
-            fommat: string
+            format: string
 
 source
     active: string
@@ -340,7 +360,14 @@ cmd.g = {
 		l.div("around", 0, 2)
 
 		c.read("around")
-		l.log(c.around[c.setting?.source?.active])
+
+		const { prev, curr, next, title } = c.around[c.setting?.source?.active]
+		l.extlog(
+			c.setting?.around?.style?.format,
+			"setting.around.style.format", {
+				prev: prev ?? "null", curr, next: next ?? "null", title
+			}
+		)
 
 		l.div("EOF", 1, 1)
 	},
@@ -371,10 +398,10 @@ cmd.g = {
 	book_show: () => {
 		l.div("book show", 0, 2)
 		l.log(l.table(
-			Object.entries(c.read("books")).map(([ name, book ]) => (
+			Object.entries(c.read("books")).map(([ name, book ]) =>
 				Object.entries(book).map(([ src, { title, time } ], k) => (
 					[ k ? "" : l.bold(name), src, l.hili(title, 3), l.hili(String(time)) ]
-				))
+				)
 			)).flat(),
 			[ 10, 10, 60 ]
 		))
@@ -450,7 +477,7 @@ cmd.g = {
 
 		else {
 			const url = ext(src.url, { page: c.around[s].curr })
-			l.log("Running " + l.hili(`${browser ?? "browser"} ${url}`))
+			l.log("Running " + l.hili(`${ browser ?? "browser" } ${url}`))
 			open(url, { app: { name: browser } })
 
 			l.log("Done.")
@@ -542,8 +569,8 @@ cmd.g = {
 			let nc = parseInt(n / m * L)
 			if (nc < 0) nc = 0
 			l.extlog(
-				c.setting?.pagewarner?.progressStyle?.stat?.fommat,
-				"setting.pagewarner.progressStyle.stat.fommat", {
+				c.setting?.pagewarner?.progressStyle?.stat?.format,
+				"setting.pagewarner.progressStyle.stat.format", {
 					progress: ($, f, b) =>
 						l.hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
 						Cc(b, $.param(1, "back")).char().r.repeat(L - nc),
@@ -569,8 +596,8 @@ cmd.g = {
 		for (let d in c.pagewarner) {
 			const n = c.pagewarner[d]
 			l.extlog(
-				c.setting?.pagewarner?.progressStyle?.diff?.fommat,
-				"setting.pagewarner.progressStyle.diff.fommat", {
+				c.setting?.pagewarner?.progressStyle?.diff?.format,
+				"setting.pagewarner.progressStyle.diff.format", {
 					date: d,
 					progress: (_, f) =>
 						l.hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * L)),
@@ -599,7 +626,9 @@ cmd.g = {
 			completer: c.setting?.interactive?.allowComplete ? interactive_completer : undefined,
 			removeHistoryDuplicates: true
 		})
-		rln.rePrompt = () => rln.setPrompt(ext(c.setting?.interactive?.prompt, { hili: s => l.hili(s) }))
+		rln.rePrompt = () => rln.setPrompt(
+			ext(c.setting?.interactive?.prompt, { hili: s => l.hili(s) })
+		)
 
 		let n = c.setting?.history?.loadToInteractive
 		if (n) {
@@ -655,13 +684,13 @@ cmd.g = {
 	},
 	hook_toggle: (name) => {
 		l.div("hook toggle", 0, 1)
-		
+
 		const h =  cli.g._hook._find(name)
 		if (! h) l.warn("Not found.")
 		else {
 			h.on = ! h.on
 			c.write("setting")
-			
+
 			l.log(h.on ? "Enabled." : "Disabled.")
 		}
 		l.div("EOF", 0, 1)
@@ -673,7 +702,7 @@ cmd.i = {
 		process.exit(0)
 	},
 	clear: async(_bang) => {
-		if (_bang === "!")
+		if (_bang)
 			await execa.command(c.setting?.interactive?.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
@@ -699,7 +728,7 @@ cmd.i = {
 
 const opt = {}
 opt.g = {
-	version:	[ "v"	, [ "null"					], "show version" ],
+	version:	[ "v"	, [ "null"					], "show version." ],
 	plain:		[ "n"	, [ "boolean"				], "disable colored output" ],
 	path:		[ "p"	, [ "string",	"p_data"	], "assign data path, override `$XBQG_DATA`." ],
 	debug:		[ "d"	, [ "boolean"				], "enable debugging output" ]
@@ -709,6 +738,11 @@ const c_dft = {
 	setting: {
 	  editor: "vim ${path}",
       browser: null,
+      around: {
+        style: {
+          format: "<< !{ green | ${prev} } | !{ yellow | ${title} } | !{ green | ${next} } >>"
+        }
+      },
 	  interactive: {
 	    prompt: "!{ hili | xbqg$ } ",
         forceClearCommand: "clear",
@@ -721,11 +755,11 @@ const c_dft = {
 	    progressStyle: {
 	      stat: {
 	        length: 80,
-	        fommat: "[ !{ progress | # | = } ] ${percent}"
+	        format: "[ !{ progress | # | = } ] ${percent}"
 	      },
 	      diff: {
 	        length: 80,
-	        fommat: "${date} | !{ progress | # } ] ${number}"
+	        format: "${date} | !{ progress | # } ] ${number}"
 	      }
 	    }
 	  },
@@ -1171,7 +1205,7 @@ const wargs = (name) => ({
 					if (! arg_i_now) return this._wrong("too_many_args", cmd_n)
 					if (arg_i_now.endsWith("_")) arg_res = arg.length
 				}
-				if (arg_i === "_bang" && ! (tk = tk === "!")) i --
+				if (arg_i_now === "_bang" && ! (tk = tk === "!")) i --
 				arg.push(tk)
 				break
 			}
