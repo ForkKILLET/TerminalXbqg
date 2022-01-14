@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version		= "4.6.0"
+const version = "4.7.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -14,7 +14,7 @@ const {
 	Logger
 }					= require("fkutil")
 
-const l				= Logger({
+const l = Logger({
 	noColor: false,
 	dftTem: {
 		black: (_, s) => l.hili(s, 0),
@@ -28,49 +28,11 @@ const l				= Logger({
 		bold: (_, s) => l.bold(s)
 	}
 }).bind()
-l.debug				= (...msg) => flag.debug && l.log(l.hili("xbqg% "), ...msg)
+l.debug	= (...msg) => flag.debug && l.log(l.hili("xbqg%"), ...msg)
+l.catch	= f => { try { return f() } catch (err) { l.warn(err) } }
 
-const std			= {
+const std = {
 	stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
-}
-
-// :: Tool
-
-const objectPath = (obj, path, create, val) => {
-	if (! path.match(/^[.[]/)) path = "." + path
-
-	const rsit = path.matchAll(/\.([_a-zA-Z][0-9_a-zA-Z]*)|\[(\d+)]/g)
-	let rs, o = obj, pa_o, k, pa_k, t
-	// Note:
-	// a.b.c
-	// o					pa_o				k		pa_k
-	// { a: b: { c: 1 } }	undefined			"a"		undefined
-	// { b: { c: 1 } }		{ a: b: { c: 1 } }	"b"		"a"
-	// { c: 1}				{ b: { c: 1 } }		"c"		"b"
-
-	while (! (rs = rsit.next()).done) {
-		t = !! rs.value[1] // Note: 0 Number, 1 String.
-		k = t ? rs.value[1] : Number(rs.value[2])
-
-		if (Is.objR(o)) {
-			if (t ^ Is.arr(o)) ;
-			else if (create) l.err("Path type conflicted.")
-		}
-
-		else if (Is.udf(o)) {
-			if (create) o = pa_o[pa_k] = t ? {} : []
-			else l.err("Path includes undefined.")
-		}
-		else if (create) l.err("Path type conflicted.")
-
-		pa_o = o
-		o = o[k]
-		pa_k = k
-	}
-
-	if (create) pa_o[pa_k] = val
-
-	return pa_o[pa_k]
 }
 
 // :: Logic
@@ -288,11 +250,14 @@ const interactive_completer = ln => {
 		ln
 	]
 }
+const use_corner_bracket = str => c.setting.source.useCornerBracket
+	? str.replaceAll("“", "「").replaceAll("”", "」")
+	: str
 
 cmd.g = {
 	fetch: async(page) => {
 		l.div("fetch", 0, 2)
-		if (! page) l.err("Page can't be null.")
+		if (! page) throw "Page can't be null."
 
 		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
 		const g = c.setting?.source?.list?.global
@@ -314,34 +279,38 @@ cmd.g = {
 					504: ski.q(503)
 				}, "")
 			)
-			else l.err(err?.message ?? err)
+			else {
+				l.warn(err?.message ?? err)
+			}
 		}
 
 		for (let i in matcher) {
 			const m = matcher[i]
 			blocks[i] = blocks[m.from]?.match(RegExp(m.regexp))?.[m.group ?? 1]
-			if (m.necessary && ! blocks[i])
-				l.log(blocks), l.err(`Block "${i}" mismatched.\nsource name: "${s}"`)
+			if (m.necessary && ! blocks[i]) {
+				l.log(blocks)
+				throw `Block "${i}" mismatched.\nsource name: "${s}"`
+			}
 		}
 
 		for (let r of replacer)
 			blocks.content = blocks.content.replace(RegExp(r[0], "g"), r[1])
 
 		if (blocks.title.match(/^[3-5][01]\d+/))
-			l.err(`HTTP error code: ${blocks.title}`)
+			throw `Got HTTP error code: ${blocks.title}.`
 
-		const chapterTitle = blocks.chapterName + " @ " + blocks.bookName
-		l.log(chapterTitle)
+		blocks.content = use_corner_bracket(blocks.content)
+		const chapterTitle = use_corner_bracket(
+			blocks.chapterName.trim() + " @ " + blocks.bookName.trim()
+		)
+		l.log(l.hili(chapterTitle, 3))
 		l.log(blocks.content)
-
-		l.div("around", 1, 1)
 
 		const a = {
 			prev: blocks.prev,
 			curr: page,
 			next: blocks.next
 		}
-		l.log(JSON.stringify(a, null, 2))
 
 		c.read("around")
 		a.title = chapterTitle
@@ -350,7 +319,7 @@ cmd.g = {
 
 		c.write("around")
 
-		l.div("EOF", 1, 1)
+		cmd.g.around()
 	},
 	fetch_prev: fetch_alias("prev"),
 	fetch_curr: fetch_alias("curr"),
@@ -364,7 +333,7 @@ cmd.g = {
 		const { prev, curr, next, title } = c.around[c.setting?.source?.active]
 		l.extlog(
 			c.setting?.around?.style?.format,
-			"setting.around.style.format", {
+			"around.style.format", {
 				prev: prev ?? "null", curr, next: next ?? "null", title
 			}
 		)
@@ -416,7 +385,7 @@ cmd.g = {
 		const key = c.around[s]?.curr.match(re)[1]
 
 		if (! key)
-			if (! _bang) l.err("No around is found.")
+			if (! _bang) throw "No around is found."
 			else return
 
 		l.div("book mark", 0, 2)
@@ -429,7 +398,7 @@ cmd.g = {
 			}
 
 		if (newBook && ! _name)
-			l.err("Book name can't be null when adding new book.")
+			throw "Book name can't be null when adding new book."
 		if (! c.books[_name]) c.books[_name] = {}
 		c.books[_name][s] = c.around[s]
 
@@ -443,7 +412,7 @@ cmd.g = {
 	book_fetch: async(name) => {
 		l.div("book fetch", 0, 1)
 
-		if (! name) l.err("Book name can't be null.")
+		if (! name) throw "Book name can't be null."
 		c.read("books")
 
 		name = Object.keys(c.books).find(n => n.startsWith(name))
@@ -501,10 +470,10 @@ cmd.g = {
 					: JSON.parse(_action === "=" ? `"${ _val_.join(" ") }"` : _action)
 			}
 			catch {
-				l.err("Illegal JSON value.")
+				throw "Illegal JSON value."
 			}
 
-			const r = objectPath(c.setting, _path, create, val)
+			const r = l.catch(() => Object.path(c.setting, _path, create, val))
 
 			c.write("setting", c.setting)
 			l.log(r)
@@ -540,8 +509,8 @@ cmd.g = {
 		l.log("Reseting.")
 
 		if (_path) {
-			const dft = objectPath(c_dft.setting, _path, false)
-			objectPath(c.setting, _path, true, dft)
+			const dft = l.catch(() => Object.path(c_dft.setting, _path, false))
+			l.catch(() => Object.path(c.setting, _path, true, dft))
 			l.log("\n%o\n", dft)
 			c.write("setting")
 		}
@@ -570,7 +539,7 @@ cmd.g = {
 			if (nc < 0) nc = 0
 			l.extlog(
 				c.setting?.pagewarner?.progressStyle?.stat?.format,
-				"setting.pagewarner.progressStyle.stat.format", {
+				"pagewarner.progressStyle.stat.format", {
 					progress: ($, f, b) =>
 						l.hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
 						Cc(b, $.param(1, "back")).char().r.repeat(L - nc),
@@ -597,7 +566,7 @@ cmd.g = {
 			const n = c.pagewarner[d]
 			l.extlog(
 				c.setting?.pagewarner?.progressStyle?.diff?.format,
-				"setting.pagewarner.progressStyle.diff.format", {
+				"pagewarner.progressStyle.diff.format", {
 					date: d,
 					progress: (_, f) =>
 						l.hili(Cc(f, _.param(0, "fore")).char().r.repeat(n / m * L)),
@@ -766,6 +735,7 @@ const c_dft = {
 	  source: {
 	    active: "xbqg",
 		autoSwitching: true,
+		useCornerBracket: true,
 	    list: {
 	      "global": {
 	        matcher: {
@@ -999,12 +969,13 @@ const c_dft = {
           on: true,
           name: "anti-addiction",
           event: [ "post-fetch" ],
+          clearEOF: true,
           action: [
             "pagewarner_stat"
           ]
         },
         {
-          on: false,
+          on: true,
           name: "page-refresh",
           interactive: true,
           event: [ "pre-fetch" ],
@@ -1050,7 +1021,11 @@ const wargs = (name) => ({
 			this.cmd[n] = new Proxy(this.cmd[n], {
 				apply: async(f, _, $) => {
 					await this.trigger([ "pre-" + n, "pre*" ], _, n)
-					await f(...$)
+					try { await f(...$) }
+					catch (err) {
+						l.err(err)
+						l.div("EOE", 1, 1)
+					}
 					await this.trigger([ "post-" + n, "post*" ], _, n)
 				}
 			})
@@ -1122,8 +1097,14 @@ const wargs = (name) => ({
 		_find: name => c.setting?.hooks?.find(h => h?.name === name),
 		_execute: async h => {
 			if (! h) return
-			if (flag.interactive || ! h?.interactive)
+			if (flag.interactive || ! h?.interactive) {
+				if (h.clearEOF) {
+					readline.moveCursor(std.stdout, 0, -1)
+					console.log(" ".repeat(35))
+					readline.moveCursor(std.stdout, 0, -1)
+				}
 				for (let ln of h.action) await cli.parse_ln(ln, true)
+			}
 		}
 	},
 	trigger(event, ...A) {
@@ -1151,7 +1132,7 @@ const wargs = (name) => ({
 		if (flag.interactive) l.warn(s)
 		else {
 			l.div("wrong usage", 0, 2)
-			l.err(s)
+			l.fatal(s)
 		}
 		return this
 	},
@@ -1211,11 +1192,14 @@ const wargs = (name) => ({
 			}
 		}
 
-		if (! flag.interactive && ! cmd_n) cmd_n = "help"
-		else {
+		if (! flag.interactive && ! cmd_n) {
+			cmd_n = "help"
+		}
+		else if (cmd_n) {
 			if (arg.length < arg_i.req) return this._wrong("too_few_args", cmd_n, arg_i.req)
 			if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
 		}
+
 		if (! is_hook) await this.trigger("run", cmd_n, raw)
 		await this.cmd[cmd_n]?.(...arg)
 
@@ -1252,7 +1236,8 @@ RELAVANT
 	.hook("run", async(C, cmd, raw) => {
 		if (C.o.version) {
 			l.log("xbqg " + version)
-			process.exit(0)
+			C.o.version = false
+			if (! flag.interactive) process.exit()
 		}
 
 		l.opt.noColor = flag.plain
@@ -1266,7 +1251,7 @@ RELAVANT
 			)) {
 				if (cmd === "help") return
 				l.div("lauch", 0, 2)
-				l.err(
+				l.fatal(
 					"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
 					"Or use `xbqg --path <p_data>` to assign it."
 				)

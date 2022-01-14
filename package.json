@@ -1,11 +1,11 @@
 {
   "name": "terminal-xbqg",
-  "version": "1.0.0",
+  "version": "4.7.0",
   "description": "",
   "main": "main.js",
   "dependencies": {
     "execa": "^4.1.0",
-    "fkutil": ">= 3.2.4",
+    "fkutil": ">= 3.3.0",
     "open": "^8.0.2"
   },
   "devDependencies": {
