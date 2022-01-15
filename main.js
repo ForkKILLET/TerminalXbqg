@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.7.0"
+const version = "4.8.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -64,6 +64,8 @@ const flag = {
 let p_data, rln
 const p_file = n => `${p_data}/${n}.json`
 
+const int_s = []
+
 const info = {}
 info.g = {
 	fetch:				[ [ "f",	"."		], [ "Fetch a page by specific <page> id." ] ],
@@ -112,100 +114,7 @@ info.i = {
 	shell:		[ [ "s",	"$"	], [ "Run command in shell." ] ],
 	help:		[ [ "h",	"?" ], [ "Show help of the given <theme> or command name." ] ],
 }
-info.t = {
-	data: `
-All data files exists in \`$XBQG_DATA\` unless user gives a \`--path\` option to override it.
-Filenames cannot be changed at present.
-
-RELAVANT
-
-? setting             -> one of the data files
-`,
-	setting: `
-Since all formats of data become Javascript object when the script runs,
-Javascript style \`path\` is used below.
-` + `
-editor: string <- config_edit
-# the editor for opening your data files
-
-browser: string <- book_browse
-# the browser for opening the current page
-
-around <- around
-	style
-		format: string
-
-interactive <- interactive
-    prompt: string
-    # what to display before your cursor in interactive-mode
-    forceClearCommand: string <- !clear !
-    # the command for clearing the console history instead of the current screen
-    allowXbqgPrefix: boolean
-    # whether to allow commands like \`xbqg ]\`
-    # helpful when you aren't used to interactive-mode
-    allowComplete: boolean
-    # whether to complete the command when pressing tab
-
-pagewarner <- pagewarner*
-    warnNum: integer
-    # how much pages you decided to read every day at most
-    onlyWarnAfterFetching <- hook anti-addiction
-    # whether display the pagewarner when only you reach the \`warnNum\`
-    progressStyle
-        stat <- pagewarner_stat
-            length: integer
-            format: string
-        diff <- pagewarner_diff
-            length: integer
-            format: string
-
-source
-    active: string
-    # what source to use now among the \`list\`
-    autoSwitching: boolean <- book_fetch
-    # whether automatically switch the source to the first available one of a book
-    list
-        [source]
-            url: string
-            matcher
-                [matcher]
-                    necessary: boolean
-                    from: string
-                    regexp: regexp
-            replacer: array
-                []: array
-                    0: string
-                    1: string
-            matchKeyInAround: regexp
-
-history <- history*
-    on: boolean
-    # whether to store commands to history
-    loadToInteractive: integer
-    # how much commands to load to interactive-mode history
-
-hooks: array
-    []
-        on: boolean <- hook_toggle
-        name: string
-        event: array
-            []: string
-            # when to trigger this hook
-        action: array
-            []: string
-            # a whole command, can be interactive
-
-RELAVANT
-
-? data                -> where to store
-? config              -> commands to operate the configuration
-? config_reset        ~~
-? config_edit         ~~
-`
-	.replace(/(?<=: )[a-z]+/g, s => l.hili(s))
-	.replace(/(?<=^ *)[a-zA-Z\[\]]+/gm, l.bold)
-	.replace(/(?<=# ).+$/gm, s => l.hili(s, 3))
-}
+info.t = require("./info")(l)
 
 const cmd = {}
 const fetch_alias = name => async() => {
@@ -266,8 +175,13 @@ cmd.g = {
 		const blocks = {}
 
 		try {
-			blocks.html = await httpx.get(ext(src.url, { page }),
-				{ headers: { "User-Agent": "xbqg/" + version } }
+			const ac = new AbortController()
+			int_s.push(() => ac.abort())
+			blocks.html = await httpx.get(
+				ext(src.url, { page }), {
+					headers: { "User-Agent": "xbqg/" + version },
+					signal: ac.signal
+				}
 			)
 		}
 		catch (err) {
@@ -280,7 +194,10 @@ cmd.g = {
 				}, "")
 			)
 			else {
-				l.warn(err?.message ?? err)
+				const msg = err.message ?? String(err)
+				l.warn(msg.endsWith(".") ? msg : msg + ".")
+				l.div("EOF", 1, 1)
+				return
 			}
 		}
 
@@ -405,9 +322,6 @@ cmd.g = {
 		c.write("books", c.books)
 		l.log(newBook ? "Added." : "Updated.")
 		l.div("EOF", 1, 1)
-	},
-	book_remove: (name) => {
-		l.div("book remove")
 	},
 	book_fetch: async(name) => {
 		l.div("book fetch", 0, 1)
@@ -619,6 +533,9 @@ cmd.g = {
 
 			rln.prompt()
 		})
+
+		int_s.push(() => rln.close())
+		rln.on("SIGINT", () => int_s.pop()())
 		rln.on("close", () => l.div("EOI", 2, 1))
 	},
 
@@ -706,17 +623,17 @@ opt.g = {
 const c_dft = {
 	setting: {
 	  editor: "vim ${path}",
-      browser: null,
-      around: {
-        style: {
-          format: "<< !{ green | ${prev} } | !{ yellow | ${title} } | !{ green | ${next} } >>"
-        }
-      },
+	  browser: null,
+	  around: {
+	    style: {
+	      format: "<< !{ green | ${prev} } | !{ yellow | ${title} } | !{ green | ${next} } >>"
+	    }
+	  },
 	  interactive: {
 	    prompt: "!{ hili | xbqg$ } ",
-        forceClearCommand: "clear",
-        allowXbqgPrefix: true,
-        allowComplete: true
+	    forceClearCommand: "clear",
+	    allowXbqgPrefix: true,
+	    allowComplete: true
 	  },
 	  pagewarner: {
 	    warnNum: 20,
@@ -734,8 +651,8 @@ const c_dft = {
 	  },
 	  source: {
 	    active: "xbqg",
-		autoSwitching: true,
-		useCornerBracket: true,
+	    autoSwitching: true,
+	    useCornerBracket: true,
 	    list: {
 	      "global": {
 	        matcher: {
@@ -890,8 +807,8 @@ const c_dft = {
 	        ],
 	        matchKeyInAround: /(.*)\//
 	      },
-          "tvbts": {
-            url: "https://www.tvbts.com/${page}.html",
+	      "tvbts": {
+	        url: "https://www.tvbts.com/${page}.html",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -919,17 +836,17 @@ const c_dft = {
 	            regexp: /<a href="\/([0-9_\/]+?).html" target="_top" class="next">/
 	          }
 	        },
-            replacer: [
-              [ /天才一秒记住本站地址：<a.+?<\/a>/, "" ],
-              [ /<p style="font-size:16px;">[^]+$/, "" ],
-              [ /转载请注明出处：<a.+?<\/a>/, "" ],
-              [ /\S+?提示您：看后求收藏.+?，接着再看更方便。/, "" ],
-              [ /《\S+?》来源：<a.+?<\/a>/, "" ]
-            ],
+	        replacer: [
+	          [ /天才一秒记住本站地址：<a.+?<\/a>/, "" ],
+	          [ /<p style="font-size:16px;">[^]+$/, "" ],
+	          [ /转载请注明出处：<a.+?<\/a>/, "" ],
+	          [ /\S+?提示您：看后求收藏.+?，接着再看更方便。/, "" ],
+	          [ /《\S+?》来源：<a.+?<\/a>/, "" ]
+	        ],
 	        matchKeyInAround: /(.*)\//
-          },
-          "bookben": {
-            url: "https://www.bookben.net/read/${page}.html",
+	      },
+	      "bookben": {
+	        url: "https://www.bookben.net/read/${page}.html",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -957,41 +874,41 @@ const c_dft = {
 	            regexp: /<a id="next_url" href="\/read\/([0-9\/])+.html" class="block">/
 	          }
 	        }
-          }
+	      }
 	    }
 	  },
-      history: {
-        on: true,
-        loadToInteractive: 10
-      },
-      hooks: [
-        {
-          on: true,
-          name: "anti-addiction",
-          event: [ "post-fetch" ],
-          clearEOF: true,
-          action: [
-            "pagewarner_stat"
-          ]
-        },
-        {
-          on: true,
-          name: "page-refresh",
-          interactive: true,
-          event: [ "pre-fetch" ],
-          action: [
-            "!clear !"
-          ]
-        },
-        {
-          on: true,
-          name: "auto-bookmark",
-          event: [ "pre-book_fetch" ],
-          action: [
-            "book_mark !"
-          ]
-        }
-      ]
+	  history: {
+	    on: true,
+	    loadToInteractive: 10
+	  },
+	  hooks: [
+	    {
+	      on: true,
+	      name: "anti-addiction",
+	      event: [ "post-fetch" ],
+	      clearEOF: true,
+	      action: [
+	        "pagewarner_stat"
+	      ]
+	    },
+	    {
+	      on: true,
+	      name: "page-refresh",
+	      interactive: true,
+	      event: [ "pre-fetch" ],
+	      action: [
+	        "!clear !"
+	      ]
+	    },
+	    {
+	      on: true,
+	      name: "auto-bookmark",
+	      event: [ "pre-book_fetch" ],
+	      action: [
+	        "book_mark !"
+	      ]
+	    }
+	  ]
 	},
 	history: [ "help" ],
 	around: {},
