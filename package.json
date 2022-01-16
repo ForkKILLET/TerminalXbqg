@@ -5,7 +5,7 @@
   "main": "main.js",
   "dependencies": {
     "execa": "^4.1.0",
-    "fkutil": ">= 3.3.0",
+    "fkutil": ">= 3.4.1",
     "open": "^8.0.2"
   },
   "devDependencies": {

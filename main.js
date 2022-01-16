@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.8.0"
+const version = "4.9.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -10,7 +10,7 @@ const open			= require("open")
 const readline		= require("readline")
 const {
 	Is, Cc, ski,
-	sleep, httpx, exT: ext, serialize,
+	httpx, exT: ext, serialize,
 	Logger
 }					= require("fkutil")
 
@@ -68,44 +68,46 @@ const int_s = []
 
 const info = {}
 info.g = {
-	fetch:				[ [ "f",	"."		], [ "Fetch a page by specific <page> id." ] ],
-	source:				[ [ "s",	".="	], [ "Modify the active [source]. Prefix matching is OK.",
-												 "Show the active source when no argument is given." ] ],
-	fetch_prev:			[ [ "p",	"["		], [ "Fetch the <prev>ious page." ] ],
-	fetch_curr:			[ [ "c",	"="		], [ "Fetch the <curr>ent page." ] ],
-	fetch_next:			[ [ "n",	"]"		], [ "Fetch the <next> page." ] ],
-	around:				[ [ "a",	"-"		], [ "Show around information,",
-												 "i.e. current title and page id of prev, curr, next." ] ],
-	book_show:			[ [ "bs",	"@-"	], [ "Show your bookcase." ] ],
-	book_mark:			[ [ "bm",	"@+"	], [ "Add the current page to your bookcase and give it a <name>.",
-												 "Update when the book already exists." ] ],
-	book_remove:		[ [ "br",	"@="	], [ "Remove a <name>d book." ] ],
-	book_fetch:			[ [ "b",	"@"		], [ "Fetch the page you read before of a <name>d book in your bookcase.",
-												 "Prefix matching is OK." ] ],
-	book_browse:		[ [ "bb",	"@!"	], [ "Open the current page in your browser" ] ],
-	config:				[ [ "c",	"%"		], [ "Print the whole configuration when no arguments is given.",
-												 "Print a specific item by the given JSON <path>.",
-												 "e.g. `config a.b[42].c`",
-												 "Delete the specific item.",
-												 "e.g. `config i.dont.want.it undefined` or `config me.too /`",
-												 "Modify the specific item. When <action> is `=`, <value> is string.",
-												 "e.g. `config a.boolean true` and",
-												 "     `config a.string = true` or `config a.string \\\"true\\\"`" ] ],
-	config_edit:		[ [ "ce",	"%!"	], [ "Edit a configuration JSON [file] by your %editor.",
-												 "In default, `setting.json`." ] ],
-	config_reset:		[ [ "cr",	"%="	], [ "Reset your configuration to the default in 5 seconds.",
-												 "The task is immediately done when `!` is given.",
-												 "Just reset the specific <path> of the configuration without delaying." ] ],
-	pagewarner_stat:	[ [ "ps",	"^"		], [ "Show today's pagewarner information using a progress bar." ] ],
-	pagewarner_diff:	[ [ "pd",	"^-"	], [ "Show pagewarner difference among days using a bar chart." ] ],
-	interactive:		[ [ "i",	"!"		], [ "Enter nteractive-mode." ] ],
-	history:			[ [ "hi",	"~"		], [ "Show history." ] ],
-	history_reset:		[ [ "hr",	"~="	], [ "Reset history." ] ],
-	hook:				[ [ "k",	"/"		], [ "Trigger a <name>d hook manually." ] ],
-	hook_show:			[ [ "ks",	"/-"	], [ "Show your hooks." ] ],
-	hook_toggle:		[ [ "kt",	"/="	], [ "Toggle a <name>d hook." ] ],
-	help:				[ [ "h",	"?"		], [ "Show help of the given <theme> or command name.",
-												 "Show usage when no arguments is given."] ],
+	fetch:				[ [ "f",	"."		], [ `Fetch a page by specific <page> id.` ] ],
+	source:				[ [ "s",	".="	], [ `Modify the active [source]. Prefix matching is OK.`,
+												 `Show the active source when no argument is given.` ] ],
+	fetch_prev:			[ [ "p",	"["		], [ `Fetch the <prev>ious page.` ] ],
+	fetch_curr:			[ [ "c",	"="		], [ `Fetch the <curr>ent page.` ] ],
+	fetch_next:			[ [ "n",	"]"		], [ `Fetch the <next> page.` ] ],
+	around:				[ [ "a",	"-"		], [ `Show around information,`,
+												 `i.e. current title and page id of prev, curr, next.` ] ],
+	book_show:			[ [ "bs",	"@-"	], [ `Show your bookcase.` ] ],
+	book_mark:			[ [ "bm",	"@+"	], [ `Add the current page to your bookcase and give it a <name>.`,
+												 `Update when the book already exists.` ] ],
+	book_remove:		[ [ "br",	"@#"	], [ `Remove a [name]d book in [src].`,
+												 `When [src] is "all", remove in all sources. When it's not given,`,
+												 `remove in the active source. When [book] is not given, remove all books.`,
+												 `Add "!" to skip waiting.` ] ],
+	book_fetch:			[ [ "b",	"@"		], [ `Fetch the page you read before of a <name>d book in your bookcase.` ] ],
+	book_browse:		[ [ "bb",	"@!"	], [ `Open the current page in your browser` ] ],
+	config:				[ [ "c",	"%"		], [ `Print the whole configuration when no arguments is given.`,
+												 `Print a specific item by the given JSON <path>.`,
+												 `e.g. "config a.b[42].c"`,
+												 `Delete the specific item.`,
+												 `e.g. "config i.dont.want.it undefined" or "config me.too /"`,
+												 `Modify the specific item. When <action> is "=", <value> is string.`,
+												 `e.g. "config a.boolean true" and`,
+												 `     "config a.string = true" or "config a.string \\'true\\'"` ] ],
+	config_edit:		[ [ "ce",	"%!"	], [ `Edit a configuration JSON [file] by your editor.`,
+												 `In default, "setting.json".` ] ],
+	config_reset:		[ [ "cr",	"%#"	], [ `Reset your configuration to the default.`,
+												 `Add "!" to skip waiting.`,
+												 `Just reset the specific <path> of the configuration without delaying.` ] ],
+	pagewarner_stat:	[ [ "ps",	"^"		], [ `Show today's pagewarner information using a progress bar.` ] ],
+	pagewarner_diff:	[ [ "pd",	"^-"	], [ `Show pagewarner difference among days using a bar chart.` ] ],
+	interactive:		[ [ "i",	"!"		], [ `Enter the interactive-mode.` ] ],
+	history:			[ [ "hi",	"~"		], [ `Show history.` ] ],
+	history_reset:		[ [ "hr",	"~#"	], [ `Reset history.` ] ],
+	hook:				[ [ "k",	"/"		], [ `Trigger a <name>d hook manually.` ] ],
+	hook_show:			[ [ "ks",	"/-"	], [ `Show your hooks.` ] ],
+	hook_toggle:		[ [ "kt",	"/="	], [ `Toggle a <name>d hook.` ] ],
+	help:				[ [ "h",	"?"		], [ `Show help of the given <theme> or command name.`,
+												 `Show usage when no arguments is given.`] ],
 }
 info.i = {
 	exit:		[ [ "e",	"!"	], [ "Exit interactive-mode." ] ],
@@ -117,6 +119,15 @@ info.i = {
 info.t = require("./info")(l)
 
 const cmd = {}
+
+const int_sleep = sec => new Promise((res, rej) => {
+	int_s.push(() => {
+		clearTimeout(tid)
+		rej("Interrupted.")
+	})
+	const tid = setTimeout(res, sec * 1000)
+})
+
 const fetch_alias = name => async() => {
 	l.div("page info", 0, 1)
 
@@ -137,6 +148,34 @@ const fetch_alias = name => async() => {
 		l.log(`${name}: null`)
 		l.div("EOF", 0, 1)
 	}
+}
+const find_src = src => {
+	if (! src) throw "Source name is empty."
+	const s = Object.keys(c.setting?.source?.list)
+		?.find(n => n !== "global" && n?.startsWith(src))
+	if (! s) throw "Source not found."
+	return s
+}
+const find_book = (name, autoSwitching, src) => {
+	if (! name) throw "Book name is empty."
+	c.read("books")
+
+	name = Object.keys(c.books).find(n => n.startsWith(name))
+	if (src && src !== "all") src = find_src(src)
+
+	if (name) {
+		const book = c.books[name]
+		let s = src ?? c.setting?.source?.active
+		if (! book[s])
+			if (! src && autoSwitching && c.setting?.source?.autoSwitching) {
+				c.setting.source.active = s = Object.keys(book)[0]
+				l.log(l.hiqt`Auto switching source to ${s}.`)
+				c.write("setting")
+			}
+			else return [ name, undefined, s, book ]
+		return [ name, book[s], s, book ]
+	}
+	return []
 }
 const history_save = ln => {
 	if (c.setting?.history?.on) {
@@ -206,7 +245,7 @@ cmd.g = {
 			blocks[i] = blocks[m.from]?.match(RegExp(m.regexp))?.[m.group ?? 1]
 			if (m.necessary && ! blocks[i]) {
 				l.log(blocks)
-				throw `Block "${i}" mismatched.\nsource name: "${s}"`
+				throw l.hiqt`Block ${i} mismatched.`
 			}
 		}
 
@@ -262,21 +301,18 @@ cmd.g = {
 		if (_src) {
 			l.div("source switch", 0, 1)
 
-			_src = Object.keys(c.setting?.source?.list)?.find(n => n !== "global" && n?.startsWith(_src))
+			_src = find_src(_src)
 
-			if (_src) {
-				c.setting.source.active = _src
+			c.setting.source.active = _src
 
-				c.write("setting")
-				l.log(`Switching source to \`${_src}\`.`)
-			}
-			else l.warn("Not found.")
+			c.write("setting")
+			l.log(l.hiqt`Switching source to ${_src}.`)
 
 			l.div("EOF", 0, 1)
 		}
 		else {
 			l.div("source active", 0, 1)
-			l.log(c.setting?.source?.active)
+			l.log(l.hiqt`The active source is ${c.setting?.source?.active} now.`)
 			l.div("EOF", 0, 1)
 		}
 	},
@@ -323,30 +359,62 @@ cmd.g = {
 		l.log(newBook ? "Added." : "Updated.")
 		l.div("EOF", 1, 1)
 	},
+	book_remove: async(_bang, _name, _src) => {
+		l.div("book remove", 0, 2)
+
+		let rm_f, rm_t, rm_l
+		if (_name) {
+			const [ n, a, s, book ] = find_book(_name, false, _src)
+
+			if (n) {
+				if (a) {
+					rm_f = () => delete book[s]
+					rm_t = 5
+					rm_l = l.hiqt`Book ${n} in source ${s}`
+				}
+				else if (_src === "all") {
+					rm_f = () => delete c.books[n]
+					rm_t = 10
+					rm_l = l.hiqt`Book ${n} in all sources`
+				}
+				else throw l.hiqt`Book ${n} not found in the active source.`
+			}
+			else throw "Book not found."
+		}
+		else {
+			rm_f = () => c.books = {}
+			rm_t = 20
+			rm_l = l.bold("ALL") + " books"
+		}
+
+		if (! _bang) {
+			l.log(`${rm_l} will be removed in ${rm_t} seconds.`)
+			await int_sleep(rm_t)
+		}
+
+		l.log("Removing.")
+
+		rm_f()
+		c.write("books")
+		l.log(_bang ? `${rm_l} is removed` : "Done.")
+		l.div("EOF", 1, 1)
+	},
 	book_fetch: async(name) => {
 		l.div("book fetch", 0, 1)
 
-		if (! name) throw "Book name can't be null."
-		c.read("books")
+		const [ n, a ] = find_book(name, true)
 
-		name = Object.keys(c.books).find(n => n.startsWith(name))
-
-		if (name) {
-			const a = c.books[name]
-			let s = c.setting?.source?.active
-			if (! a[s] && c.setting?.source?.autoSwitching) {
-				c.setting.source.active = s = Object.keys(a ?? {})[0]
-				l.log(`Auto switching source to \`${s}\`.`)
-				c.write("setting")
+		if (n) {
+			if (a) {
+				l.log(l.hiqt`Fetching book ${n}.`)
+				await cmd.g.fetch(a.curr)
 			}
-			l.log(`Fetching book \`${name}\`.`)
-			await cmd.g.fetch(a[s].curr)
+			else {
+				l.warn(l.hiqt`Book ${n} not found in the active source.`)
+				l.div("EOF", 0, 1)
+			}
 		}
-		else {
-			l.warn("Not found.")
-			l.div("EOF", 0, 1)
-			return
-		}
+		else throw "Book not found."
 	},
 	book_browse: () => {
 		l.div("book browse", 0, 2)
@@ -356,7 +424,7 @@ cmd.g = {
 		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
 		const browser = c.setting?.browser
 
-		if (! c.around[s]) l.warn("Not found.")
+		if (! c.around[s]) throw "Around not found."
 
 		else {
 			const url = ext(src.url, { page: c.around[s].curr })
@@ -416,8 +484,8 @@ cmd.g = {
 		l.div("config reset", 0, 2)
 
 		if (! _path && ! _bang) {
-			l.warn("The default setting will be restored in 5 seconds.")
-			await sleep(5000)
+			l.log("The default setting will be restored in 5 seconds.")
+			await int_sleep(5)
 		}
 
 		l.log("Reseting.")
@@ -447,7 +515,7 @@ cmd.g = {
 			if (c.setting?.pagewarner?.onlyWarnAfterFetching === true) return
 
 			l.log(`Reading progress today: [${n} / ${m}]`)
-			l.log(`${m - n} page${m - n <= 1 ? "" : "s"} left.`)
+			l.log(`${m - n} page${ m - n <= 1 ? "" : "s" } left.`)
 			const L = c.setting?.pagewarner?.progressStyle?.stat?.length
 			let nc = parseInt(n / m * L)
 			if (nc < 0) nc = 0
@@ -463,7 +531,7 @@ cmd.g = {
 		}
 		else {
 			l.warn(`Reading progress today: [${n} / ${m}]`)
-			l.warn(`${n - m} page${m - n <= 1 ? "" : "s"} more than the warning num!`)
+			l.warn(`${n - m} page${ m - n <= 1 ? "" : "s" } more than the warning num!`)
 			l.warn("Suggestion: stop now!")
 		}
 		l.div("EOF", 1, 1)
@@ -571,8 +639,8 @@ cmd.g = {
 	hook_toggle: (name) => {
 		l.div("hook toggle", 0, 1)
 
-		const h =  cli.g._hook._find(name)
-		if (! h) l.warn("Not found.")
+		const h = cli.g._hook._find(name)
+		if (! h) throw "Hook not found."
 		else {
 			h.on = ! h.on
 			c.write("setting")
@@ -671,7 +739,7 @@ const c_dft = {
 	        ]
 	      },
 	      "xbqg": {
-	        url: "https://www.vbiquge.com/${page}.html",
+	        url: "https://www.zxbiquge.com/${page}.html",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
@@ -940,7 +1008,7 @@ const wargs = (name) => ({
 					await this.trigger([ "pre-" + n, "pre*" ], _, n)
 					try { await f(...$) }
 					catch (err) {
-						l.err(err)
+						l.err(flag.debug ? err?.stack ?? err : err)
 						l.div("EOE", 1, 1)
 					}
 					await this.trigger([ "post-" + n, "post*" ], _, n)
@@ -964,7 +1032,7 @@ const wargs = (name) => ({
 				v[3].map(o => {
 					const n = o.replace(/_$/, "...")
 					return n[0] === "_"
-						? "[" + l.hili(n.slice(1)) + "]"
+						? "[" + l.hili(n === "_bang" ? "!" : n.slice(1)) + "]"
 						: "<" + l.hili(n) + ">"
 				}).join(" ")
 			]
@@ -983,9 +1051,12 @@ const wargs = (name) => ({
 					+ l.table(
 						Object.entries(this.info).map(([ k, v ]) => {
 							const tab = [ cmd_head(k, v) ]
-							for (let i in v[1]) {
+							for (const i in v[1]) {
 								if (! tab[i]) tab[i] = [ "", "" ]
+								let q = 0
 								tab[i][2] = v[1][i]
+									.replace(/(?<=[\[<])[a-z]+(?=[\]>])/g, s => l.hili(s))
+									.replace(/(?<=")[^]+?(?=")/g, s => q ++ % 2 ? s : l.hili(s, 3))
 							}
 							return tab
 						}).flat(), [ 30, 25 ]
@@ -996,7 +1067,7 @@ const wargs = (name) => ({
 				txt = _theme.toUpperCase() + "\n\n" + ext.trim()
 			}
 			else {
-				let e = this._find_cmd(_theme)
+				const e = this._find_cmd(_theme)
 				if (e) txt = "COMMAND\n\n" + cmd_head(...e).join(" ") + "\n" + e[1][1].join("\n")
 				else l.warn("Unknown command or theme.")
 			}
@@ -1130,11 +1201,11 @@ cli.g = wargs("g")
 	.init({
 		has_option: true,
 		wrong_usage: {
-			unknown_cmd: cmd_n => `Unknown command \`${cmd_n}\`. Use \`help\` to get usage.`,
-			too_many_args: cmd_n => `Too many arguments for \`${cmd_n}\`. Use \`help ${cmd_n}\` to get usage.`,
-			too_few_args: (cmd_n, req) => `Too few arguments for \`${cmd_n}\`, required ${req}. `
-				+ `Use \`help ${cmd_n}\` to get usage.`,
-			illegal_option_bang: opt_n => `Option \`${opt_n}\` is not a boolean one, so it cannot have a bang \`!\``
+			unknown_cmd: cmd_n => l.hiqt`Unknown command ${cmd_n}. Use ${"help"} to get usage.`,
+			too_many_args: cmd_n => l.hiqt`Too many arguments for ${cmd_n}. Use ${ "help " + cmd_n } to get usage.`,
+			too_few_args: (cmd_n, req) => `Too few arguments for ${cmd_n}, required ${req}. `
+				+ l.hiqt`Use ${ "help " + cmd_n } to get usage.`,
+			illegal_option_bang: opt_n => l.hiqt`Option ${opt_n} is not a boolean one, so it cannot have a bang ${"!"}`
 		}
 	})
 	.help({ themes: info.t, extra: `
@@ -1192,8 +1263,8 @@ RELAVANT
 cli.i = wargs("i")
 	.init({
 		wrong_usage: {
-			unknown_cmd: cmd => `Unknown instruction \`${cmd}\`. Use \`! help\` to get usage.`,
-			too_many_args: cmd => `Too many arguments for \`${cmd}\`. Use \`! help ${cmd}\` to get usage.`
+			unknown_cmd: cmd => l.hiqt`Unknown instruction ${cmd}. Use ${"! help"} to get usage.`,
+			too_many_args: cmd => l.hiqt`Too many arguments for ${cmd}. Use ${"! help ${cmd}"} to get usage.`
 		}
 	})
 	.help({ extra: "Interactive instruction starts with a bang \`!\`." })
