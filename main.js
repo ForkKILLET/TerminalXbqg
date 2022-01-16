@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.0"
+const version = "4.10.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -542,7 +542,7 @@ cmd.g = {
 	pagewarner_stat: () => {
 		c.read("pagewarner")
 
-		const today = new Date().format("yyyy-mm-dd")
+		const today = new Date().format("yyyymmdd")
 		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner?.warnNum
 
 		l.div("pagewarner stat", 0, 2)

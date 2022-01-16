@@ -1,43 +1,82 @@
 # TerminalXbqg
 
-## Usage
+[简体中文](ReadMe.zh-Hans.md) | [English](ReadMe.md)
 
-### Install
+## Install
 
-```plain
-$ git clone https://github.com/ForkFG/TerminalXbqg.git
-$ cd TerminalXbqg
-$ yarn
-$ chmod 755 main.js # if necessary
+1. Download
+	```plain
+	$ git clone https://github.com/ForkFG/TerminalXbqg.git
+	$ cd TerminalXbqg
+	$ yarn
+	$ chmod 755 main.js # if necessary
+	```
 
-$ alias xbqg="/path/to/TerminalXbqg/main.js"
-# ----- OR -----
-$ export PATH="$PATH:/path/to/TerminalXbqg"
-# Then add this statement to <~/.bashrc> or <~/.zshrc>
-# ----- OR -----
-# cd /path/to/bin
-# ln -s /path/to/TerminalXbqg/main.js xbqg
+2. Link
 
-$ export XBQG_DATA="/path/to/..." # important!
-# Also add this statement to <~/.bashrc> or <~/.zshrc>
-```
+   Add
+   
+   ```plain
+   $ alias xbqg="/path/to/TerminalXbqg/main.js"
+   ```
 
-## FAQ
+   or
+   
+   ```plain
+   $ export PATH="$PATH:/path/to/TerminalXbqg"
+   ```
 
-1.	**Q:** Why is the help EMPTY?  
-	**A:** ~~I don't know. if you find it out, please contact me.~~ We eventually have a help.
-2.	**Q:** Why does the script crash after updating?  
-	**A:** ~~Also update the npm package `fkutil`. If this doesn't work, submit an issue.~~  You no longer need to update dependences now.
-3.	**Q:** The text contains weird characters.  
-	**A:** They come from the xbqg websites, however, `replacer` can help.
-4.	**Q:** I want to contribute.  
-	**A:** GREAT!!!!!!!!!!
-5.	**Q:** The script doesn't work on ... OS.  
-	**A:** Sorry. I only tested it on:
-	- MacOS Catalina (Terminal.app)
-	- MacOS Catalina Recovery (Terminal.app)
-	- Archlinux 5.10.14-arch1-1 (tty & Konsole)
-	- Windows 10 (Git bash)
+   to your terminal profile. (e.g. `.zshrc`)
+   
+3. Configure environment variables
 
-## EOF
+   ```plain
+   $ export XBQG_DATA="/path/to/..."
+   ```
+
+   Add this to the profile too.
+
+# FAQ
+
+- Q: Why does the text contain weird characters?
+
+  A: They are from the xbqg websites, however, `replacer` can help.
+
+- Q: I'd like to add new source, how?
+
+  A: You have to edit `source.list` in `$XBQG_DATA/setting.json` .  `replacer` is also defined here.
+
+- Q: My settings went wrong.
+
+  A: Try `xbqg config_reset`.
+
+- Q: TerminalXbqg doesn't work on xx OS.
+
+  A: Sorry, I've only tested it on:
+
+    - Archlinux 5.10.14-arch1-1 (tty & Konsole)
+
+    - MacOS Catalina (Terminal.app)
+    - MacOS Catalina Recovery (Terminal.app)
+    - Windows 10 (Git bash)
+
+  You may raise an issue [here](https://github.com/ForkKILLET/TerminalXbqg/issues).
+
+  **Require node.js > v16.**
+
+# Screenshots
+
+- `interactive (!)` and `watch (..)`
+
+  ![sc-1](https://s2.loli.net/2022/01/16/aTU4NJk3jmfpv6s.gif)
+
+- `around`, `pagewarner` and `useCornerBracket`
+
+  ![sc-2](https://s2.loli.net/2022/01/16/JtMrKuhie9g6EHU.png)
+  
+- `book_fetch (@)`, `hook (automatical book_mark)`, `autoSwitching`
+
+  ![sc-3](https://s2.loli.net/2022/01/16/aVHK9yPNThLuAks.png)
+
+# EOF
 
