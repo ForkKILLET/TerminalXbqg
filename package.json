@@ -1,9 +1,10 @@
 {
   "name": "terminal-xbqg",
-  "version": "4.9.1",
+  "version": "4.9.2",
   "description": "",
   "main": "main.js",
   "dependencies": {
+    "dayjs": "^1.10.7",
     "execa": "^4.1.0",
     "fkutil": ">= 3.4.1",
     "open": "^8.0.2"

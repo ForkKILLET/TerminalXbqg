@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.9.1"
+const version = "4.9.2"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -13,6 +13,7 @@ const {
 	httpx, exT: ext, serialize,
 	Logger
 }					= require("fkutil")
+const dayjs			= require("dayjs").extend(require("dayjs/plugin/relativeTime"))
 
 const l = Logger({
 	noColor: false,
@@ -271,9 +272,15 @@ cmd.g = {
 		l.div("book show", 0, 2)
 		l.log(l.table(
 			Object.entries(c.read("books")).map(([ name, book ]) =>
-				Object.entries(book).map(([ src, { title, time } ], k) => (
-					[ k ? "" : l.bold(name), src, l.hili(title, 3), l.hili(String(time)) ]
-				)
+				Object.entries(book).map(([ src, { title, time } ], k) => [
+					k ? "" : l.bold(name),
+					src,
+					l.hili(title, 3),
+					l.hili(c.setting.bookcase?.useRelativeTime
+						? dayjs(time).fromNow()
+						: new Date(time).format("yyyy-mm-dd")
+					)
+				]
 			)).flat(),
 			[ 10, 10, 60 ]
 		))
@@ -457,7 +464,7 @@ cmd.g = {
 	pagewarner_stat: () => {
 		c.read("pagewarner")
 
-		const today = new Date().format("yyyymmdd")
+		const today = new Date().format("yyyy-mm-dd")
 		const n = c.pagewarner[today] ?? 0, m = c.setting?.pagewarner?.warnNum
 
 		l.div("pagewarner stat", 0, 2)
@@ -666,6 +673,9 @@ const c_dft = {
 	        format: "${date} | !{ progress | # } ] ${number}"
 	      }
 	    }
+	  },
+	  bookcase: {
+	    useRelativeTime: true
 	  },
 	  source: {
 	    active: "xbqg",
