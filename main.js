@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.9.0"
+const version = "4.9.1"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -66,57 +66,7 @@ const p_file = n => `${p_data}/${n}.json`
 
 const int_s = []
 
-const info = {}
-info.g = {
-	fetch:				[ [ "f",	"."		], [ `Fetch a page by specific <page> id.` ] ],
-	source:				[ [ "s",	".="	], [ `Modify the active [source]. Prefix matching is OK.`,
-												 `Show the active source when no argument is given.` ] ],
-	fetch_prev:			[ [ "p",	"["		], [ `Fetch the <prev>ious page.` ] ],
-	fetch_curr:			[ [ "c",	"="		], [ `Fetch the <curr>ent page.` ] ],
-	fetch_next:			[ [ "n",	"]"		], [ `Fetch the <next> page.` ] ],
-	around:				[ [ "a",	"-"		], [ `Show around information,`,
-												 `i.e. current title and page id of prev, curr, next.` ] ],
-	book_show:			[ [ "bs",	"@-"	], [ `Show your bookcase.` ] ],
-	book_mark:			[ [ "bm",	"@+"	], [ `Add the current page to your bookcase and give it a <name>.`,
-												 `Update when the book already exists.` ] ],
-	book_remove:		[ [ "br",	"@#"	], [ `Remove a [name]d book in [src].`,
-												 `When [src] is "all", remove in all sources. When it's not given,`,
-												 `remove in the active source. When [book] is not given, remove all books.`,
-												 `Add "!" to skip waiting.` ] ],
-	book_fetch:			[ [ "b",	"@"		], [ `Fetch the page you read before of a <name>d book in your bookcase.` ] ],
-	book_browse:		[ [ "bb",	"@!"	], [ `Open the current page in your browser` ] ],
-	config:				[ [ "c",	"%"		], [ `Print the whole configuration when no arguments is given.`,
-												 `Print a specific item by the given JSON <path>.`,
-												 `e.g. "config a.b[42].c"`,
-												 `Delete the specific item.`,
-												 `e.g. "config i.dont.want.it undefined" or "config me.too /"`,
-												 `Modify the specific item. When <action> is "=", <value> is string.`,
-												 `e.g. "config a.boolean true" and`,
-												 `     "config a.string = true" or "config a.string \\'true\\'"` ] ],
-	config_edit:		[ [ "ce",	"%!"	], [ `Edit a configuration JSON [file] by your editor.`,
-												 `In default, "setting.json".` ] ],
-	config_reset:		[ [ "cr",	"%#"	], [ `Reset your configuration to the default.`,
-												 `Add "!" to skip waiting.`,
-												 `Just reset the specific <path> of the configuration without delaying.` ] ],
-	pagewarner_stat:	[ [ "ps",	"^"		], [ `Show today's pagewarner information using a progress bar.` ] ],
-	pagewarner_diff:	[ [ "pd",	"^-"	], [ `Show pagewarner difference among days using a bar chart.` ] ],
-	interactive:		[ [ "i",	"!"		], [ `Enter the interactive-mode.` ] ],
-	history:			[ [ "hi",	"~"		], [ `Show history.` ] ],
-	history_reset:		[ [ "hr",	"~#"	], [ `Reset history.` ] ],
-	hook:				[ [ "k",	"/"		], [ `Trigger a <name>d hook manually.` ] ],
-	hook_show:			[ [ "ks",	"/-"	], [ `Show your hooks.` ] ],
-	hook_toggle:		[ [ "kt",	"/="	], [ `Toggle a <name>d hook.` ] ],
-	help:				[ [ "h",	"?"		], [ `Show help of the given <theme> or command name.`,
-												 `Show usage when no arguments is given.`] ],
-}
-info.i = {
-	exit:		[ [ "e",	"!"	], [ "Exit interactive-mode." ] ],
-	clear:		[ [ "c",	"-" ], [ "Clear the console." ] ],
-	eval:		[ [ "v",	"+"	], [ "Run Javascript code." ] ],
-	shell:		[ [ "s",	"$"	], [ "Run command in shell." ] ],
-	help:		[ [ "h",	"?" ], [ "Show help of the given <theme> or command name." ] ],
-}
-info.t = require("./info")(l)
+const info = require("./info")(l)
 
 const cmd = {}
 
@@ -1053,10 +1003,7 @@ const wargs = (name) => ({
 							const tab = [ cmd_head(k, v) ]
 							for (const i in v[1]) {
 								if (! tab[i]) tab[i] = [ "", "" ]
-								let q = 0
 								tab[i][2] = v[1][i]
-									.replace(/(?<=[\[<])[a-z]+(?=[\]>])/g, s => l.hili(s))
-									.replace(/(?<=")[^]+?(?=")/g, s => q ++ % 2 ? s : l.hili(s, 3))
 							}
 							return tab
 						}).flat(), [ 30, 25 ]
@@ -1208,19 +1155,7 @@ cli.g = wargs("g")
 			illegal_option_bang: opt_n => l.hiqt`Option ${opt_n} is not a boolean one, so it cannot have a bang ${"!"}`
 		}
 	})
-	.help({ themes: info.t, extra: `
-CONTACT
-
-GitHub Issue         <https://github.com/ForkFG/TerminalXbqg/issues>
-Email                <fork_killet@qq.com>
-
-RELAVANT
-
-?                    -> this
-! ?                  -> interactive instructions
-? data               -> data files
-? setting            -> the configuration
-`		})
+	.help({ themes: info.t, extra: info.g_ex })
 	.hook("run", async(C, cmd, raw) => {
 		if (C.o.version) {
 			l.log("xbqg " + version)
@@ -1267,7 +1202,7 @@ cli.i = wargs("i")
 			too_many_args: cmd => l.hiqt`Too many arguments for ${cmd}. Use ${"! help ${cmd}"} to get usage.`
 		}
 	})
-	.help({ extra: "Interactive instruction starts with a bang \`!\`." })
+	.help({ extra: info.i_ex })
 	.hook("run", (_, __, raw) => history_save("!" + raw.join(" ")))
 cli.parse_ln = async (ln, is_hook) =>
 	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "), is_hook)
