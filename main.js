@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.9.2"
+const version = "4.10.0"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -30,7 +30,12 @@ const l = Logger({
 	}
 }).bind()
 l.debug	= (...msg) => flag.debug && l.log(l.hili("xbqg%"), ...msg)
-l.catch	= f => { try { return f() } catch (err) { l.warn(err) } }
+l.clearEOF = () => {
+	if (l.opt.drop) return
+	readline.moveCursor(std.stdout, 0, -1)
+	l.log(" ".repeat(35))
+	readline.moveCursor(std.stdout, 0, -1)
+}
 
 const std = {
 	stdin: process.stdin, stdout: process.stdout, stderr: process.stderr
@@ -57,10 +62,17 @@ const c = {
 }
 
 const flag = {
+	hook: true,
+	throw: false,
 	lauch: true,
 	interactive: false,
 	get debug() { return cli.g.o.debug ?? false },
-	get plain() { return cli.g.o.plain ?? false }
+	get plain() { return cli.g.o.plain ?? false },
+	with: async (flag_, f) => {
+		for (const n in flag_) [ flag[n], flag_[n] ] = [ flag_[n], flag[n] ]
+		await f()
+		for (const n in flag_) flag[n] = flag_[n]
+	}
 }
 let p_data, rln
 const p_file = n => `${p_data}/${n}.json`
@@ -73,17 +85,17 @@ const cmd = {}
 
 const int_sleep = sec => new Promise((res, rej) => {
 	int_s.push(() => {
-		clearTimeout(tid)
+		clearTimeout(t)
 		rej("Interrupted.")
 	})
-	const tid = setTimeout(res, sec * 1000)
+	const t = setTimeout(res, sec * 1000)
 })
 
 const fetch_alias = name => async() => {
 	l.div("page info", 0, 1)
 
 	c.read("around")
-	const page = c.around[c.setting?.source?.active]?.[name]
+	const page = c.around[c.setting.source.active]?.[name]
 
 	if (page) {
 		c.read("pagewarner")
@@ -102,7 +114,7 @@ const fetch_alias = name => async() => {
 }
 const find_src = src => {
 	if (! src) throw "Source name is empty."
-	const s = Object.keys(c.setting?.source?.list)
+	const s = Object.keys(c.setting.source.list)
 		?.find(n => n !== "global" && n?.startsWith(src))
 	if (! s) throw "Source not found."
 	return s
@@ -116,9 +128,9 @@ const find_book = (name, autoSwitching, src) => {
 
 	if (name) {
 		const book = c.books[name]
-		let s = src ?? c.setting?.source?.active
+		let s = src ?? c.setting.source.active
 		if (! book[s])
-			if (! src && autoSwitching && c.setting?.source?.autoSwitching) {
+			if (! src && autoSwitching && c.setting.source.autoSwitching) {
 				c.setting.source.active = s = Object.keys(book)[0]
 				l.log(l.hiqt`Auto switching source to ${s}.`)
 				c.write("setting")
@@ -129,7 +141,7 @@ const find_book = (name, autoSwitching, src) => {
 	return []
 }
 const history_save = ln => {
-	if (c.setting?.history?.on) {
+	if (c.setting.history?.on) {
 		c.read("history")
 		c.history.push(ln)
 		c.write("history")
@@ -158,8 +170,8 @@ cmd.g = {
 		l.div("fetch", 0, 2)
 		if (! page) throw "Page can't be null."
 
-		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
-		const g = c.setting?.source?.list?.global
+		const s = c.setting.source.active, src = c.setting.source.list[s]
+		const g = c.setting.source.list?.global
 		const matcher = Object.assign({}, g.matcher, src.matcher ?? {})
 		const replacer = g.replacer.concat(src.replacer ?? [])
 		const blocks = {}
@@ -175,7 +187,7 @@ cmd.g = {
 			)
 		}
 		catch (err) {
-			if (Is.num(err)) l.log("Unexpected response code " + err + "." + ski(
+			if (Is.num(err)) throw (l.hiqt`Unexpected response code ${err}.` + ski(
 				err, {
 					404: " Perhaps the given page is wrong.",
 					502: " Perhaps the server go wrong. You may switch the source.",
@@ -185,9 +197,7 @@ cmd.g = {
 			)
 			else {
 				const msg = err.message ?? String(err)
-				l.warn(msg.endsWith(".") ? msg : msg + ".")
-				l.div("EOF", 1, 1)
-				return
+				throw msg.endsWith(".") ? msg : msg + "."
 			}
 		}
 
@@ -226,7 +236,9 @@ cmd.g = {
 
 		c.write("around")
 
-		cmd.g.around()
+		await cmd.g.around()
+
+		return a
 	},
 	fetch_prev: fetch_alias("prev"),
 	fetch_curr: fetch_alias("curr"),
@@ -237,9 +249,9 @@ cmd.g = {
 
 		c.read("around")
 
-		const { prev, curr, next, title } = c.around[c.setting?.source?.active]
+		const { prev, curr, next, title } = c.around[c.setting.source.active]
 		l.extlog(
-			c.setting?.around?.style?.format,
+			c.setting.around?.style?.format,
 			"around.style.format", {
 				prev: prev ?? "null", curr, next: next ?? "null", title
 			}
@@ -263,7 +275,7 @@ cmd.g = {
 		}
 		else {
 			l.div("source active", 0, 1)
-			l.log(l.hiqt`The active source is ${c.setting?.source?.active} now.`)
+			l.log(l.hiqt`The active source is ${c.setting.source.active} now.`)
 			l.div("EOF", 0, 1)
 		}
 	},
@@ -272,17 +284,18 @@ cmd.g = {
 		l.div("book show", 0, 2)
 		l.log(l.table(
 			Object.entries(c.read("books")).map(([ name, book ]) =>
-				Object.entries(book).map(([ src, { title, time } ], k) => [
+				Object.entries(book).map(([ src, { title, time, next } ], k) => [
 					k ? "" : l.bold(name),
 					src,
 					l.hili(title, 3),
 					l.hili(c.setting.bookcase?.useRelativeTime
 						? dayjs(time).fromNow()
 						: new Date(time).format("yyyy-mm-dd")
-					)
+					),
+					l.hili(next ? "" : "*", 5)
 				]
 			)).flat(),
-			[ 10, 10, 60 ]
+			[ 10, 10, 60, 15 ]
 		))
 		l.div("EOF", 1, 1)
 	},
@@ -290,8 +303,8 @@ cmd.g = {
 		c.read("around")
 		c.read("books")
 
-		const s = c.setting?.source?.active
-		const re = RegExp(c.setting?.source?.list[s]?.matchKeyInAround)
+		const s = c.setting.source.active
+		const re = RegExp(c.setting.source.list[s]?.matchKeyInAround)
 		const key = c.around[s]?.curr.match(re)[1]
 
 		if (! key)
@@ -378,8 +391,8 @@ cmd.g = {
 
 		c.read("around")
 
-		const s = c.setting?.source?.active, src = c?.setting?.source?.list[s]
-		const browser = c.setting?.browser
+		const s = c.setting.source.active, src = c.setting.source.list[s]
+		const browser = c.setting.browser
 
 		if (! c.around[s]) throw "Around not found."
 
@@ -391,6 +404,71 @@ cmd.g = {
 			l.log("Done.")
 		}
 		l.div("EOF", 1, 1)
+	},
+
+	watch: async() => {
+		await cmd.g.book_show()
+
+		l.clearEOF()
+		l.log("Watching.")
+
+		const check = [], updated = []
+		let i = 0
+		for (const n in c.books) for (const s in c.books[n]) {
+			const a = c.books[n][s]
+			if (! a.next) check.push([ i, n, a, s ])
+			i ++
+		}
+
+		const o_s = c.setting.source.active
+
+		const lx = 10 + 10 + 60 + 15
+		for (let [ k, n, a, s ] of check) {
+			const draw = ch => {
+				readline.moveCursor(std.stdout, lx, - i + k - 2)
+				l.logi(ch)
+				readline.moveCursor(std.stdout, - lx - 1, i - k + 2)
+			}
+
+			const spinner = "/-\\|"
+			let sp_i = 0, sp_t = setInterval(() => {
+				l.opt.drop = false
+				draw(l.hili(spinner[sp_i], 4))
+				l.opt.drop = true
+				if (++ sp_i === spinner.length) sp_i = 0
+			}, 300)
+
+			l.opt.drop = true
+			c.setting.source.active = s
+			let err, res
+			try {
+				await flag.with({ throw: true, hook: false }, async() =>
+					res = await cmd.g.fetch(a.curr)
+				)
+			}
+			catch (e) { err = e }
+			clearInterval(sp_t)
+			l.opt.drop = false
+			if (err) draw(l.hili("!", 1))
+			else if (res.next) {
+				draw(l.hili("√"))
+				updated.push([ n, a, s ])
+				l.opt.drop = true
+				await cmd.g.book_mark(false)
+				l.opt.drop = false
+			}
+			else draw(l.hili("x", 5))
+		}
+
+		c.setting.source.active = o_s
+		c.write("setting")
+
+		l.log(`Updated: [ ${updated.length} / ${check.length} ]`)
+		l.div("EOF", 1, 1)
+	},
+
+	watch_toggle: () => {
+
 	},
 
 	config: (_path, _action, _val_) => {
@@ -422,7 +500,7 @@ cmd.g = {
 	},
 	config_edit: async(_file) => {
 		const path = p_data + "/" + (_file ?? "setting") + ".json"
-		const editor = ext(c.setting?.editor, { path })
+		const editor = ext(c.setting.editor, { path })
 
 		l.div("config edit", 0, 2)
 		l.log("Running " + l.hili("$ " + editor))
@@ -465,19 +543,19 @@ cmd.g = {
 		c.read("pagewarner")
 
 		const today = new Date().format("yyyy-mm-dd")
-		const n = c.pagewarner[today] ?? 0, m = c.setting?.pagewarner?.warnNum
+		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner?.warnNum
 
 		l.div("pagewarner stat", 0, 2)
 		if (n <= m) {
-			if (c.setting?.pagewarner?.onlyWarnAfterFetching === true) return
+			if (c.setting.pagewarner?.onlyWarnAfterFetching === true) return
 
 			l.log(`Reading progress today: [${n} / ${m}]`)
 			l.log(`${m - n} page${ m - n <= 1 ? "" : "s" } left.`)
-			const L = c.setting?.pagewarner?.progressStyle?.stat?.length
+			const L = c.setting.pagewarner?.progressStyle?.stat?.length
 			let nc = parseInt(n / m * L)
 			if (nc < 0) nc = 0
 			l.extlog(
-				c.setting?.pagewarner?.progressStyle?.stat?.format,
+				c.setting.pagewarner?.progressStyle?.stat?.format,
 				"pagewarner.progressStyle.stat.format", {
 					progress: ($, f, b) =>
 						l.hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
@@ -498,13 +576,13 @@ cmd.g = {
 
 		l.div("pagewarner diff", 0, 2)
 
-		const L = c.setting?.pagewarner?.progressStyle?.diff?.length
+		const L = c.setting.pagewarner?.progressStyle?.diff?.length
 		let m = L; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
 
 		for (let d in c.pagewarner) {
 			const n = c.pagewarner[d]
 			l.extlog(
-				c.setting?.pagewarner?.progressStyle?.diff?.format,
+				c.setting.pagewarner?.progressStyle?.diff?.format,
 				"pagewarner.progressStyle.diff.format", {
 					date: d,
 					progress: (_, f) =>
@@ -531,14 +609,14 @@ cmd.g = {
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			completer: c.setting?.interactive?.allowComplete ? interactive_completer : undefined,
+			completer: c.setting.interactive?.allowComplete ? interactive_completer : undefined,
 			removeHistoryDuplicates: true
 		})
 		rln.rePrompt = () => rln.setPrompt(
-			ext(c.setting?.interactive?.prompt, { hili: s => l.hili(s) })
+			ext(c.setting.interactive?.prompt, { hili: s => l.hili(s) })
 		)
 
-		let n = c.setting?.history?.loadToInteractive
+		let n = c.setting.history?.loadToInteractive
 		if (n) {
 			c.read("history")
 			rln.history = c.history.slice(- n).reverse()
@@ -552,7 +630,7 @@ cmd.g = {
 				return
 			}
 
-			if (c.setting?.interactive?.allowXbqgPrefix) ln = ln?.replace(/^xbqg /, "")
+			if (c.setting.interactive?.allowXbqgPrefix) ln = ln?.replace(/^xbqg /, "")
 
 			await cli.parse_ln(ln)
 
@@ -589,7 +667,7 @@ cmd.g = {
 	hook_show: () => {
 		l.div("hook show", 0, 2)
 
-		l.log(c.setting?.hooks)
+		l.log(c.setting.hooks)
 
 		l.div("EOF", 1, 1)
 	},
@@ -610,11 +688,11 @@ cmd.g = {
 cmd.i = {
 	exit: () => {
 		rln.close()
-		process.exit(0)
+		process.exit()
 	},
 	clear: async(_bang) => {
 		if (_bang)
-			await execa.command(c.setting?.interactive?.forceClearCommand, std)
+			await execa.command(c.setting.interactive?.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
 	eval: (code_) => {
@@ -963,17 +1041,21 @@ const wargs = (name) => ({
 			const arg = this.info[n][3] =
 				this.cmd[n].toString().match(/^(async)?\((.*)\)/)?.[2]?.split(", ").filter(s => s)
 			arg.req = arg.reduce((x, s) => s.startsWith("_") ? x : x + 1, 0)
-			this.cmd[n] = new Proxy(this.cmd[n], {
-				apply: async(f, _, $) => {
-					await this.trigger([ "pre-" + n, "pre*" ], _, n)
-					try { await f(...$) }
-					catch (err) {
-						l.err(flag.debug ? err?.stack ?? err : err)
-						l.div("EOE", 1, 1)
-					}
-					await this.trigger([ "post-" + n, "post*" ], _, n)
+			const f = this.cmd[n]
+			this.cmd[n] = async (...p) => {
+				await this.trigger([ "pre-" + n, "pre*" ], f, n)
+				let res
+				try {
+					res = await f(...p)
 				}
-			})
+				catch (err) {
+					if (flag.throw) throw err
+					l.err(flag.debug ? err?.stack ?? err : err)
+					l.div("EOE", 1, 1)
+				}
+				await this.trigger([ "post-" + n, "post*" ], f, n)
+				return res
+			}
 		}
 	},
 	_find_cmd(n) {
@@ -1032,27 +1114,26 @@ const wargs = (name) => ({
 			l.log(txt.replace(/(^|\n)[A-Z]+\n/g, l.bold))
 			l.div("EOF", 1, 1)
 
-			if (! flag.interactive) process.exit(0)
+			if (! flag.interactive) process.exit()
 		}
 		this._init_cmd([ "help" ])
 
 		return this
 	},
 	_hook: {
-		_find: name => c.setting?.hooks?.find(h => h?.name === name),
+		_find: name => c.setting.hooks?.find(h => h?.name === name),
 		_execute: async h => {
 			if (! h) return
 			if (flag.interactive || ! h?.interactive) {
-				if (h.clearEOF) {
-					readline.moveCursor(std.stdout, 0, -1)
-					console.log(" ".repeat(35))
-					readline.moveCursor(std.stdout, 0, -1)
-				}
-				for (let ln of h.action) await cli.parse_ln(ln, true)
+				if (h.clearEOF) l.clearEOF()
+				for (let ln of h.action) await flag.with({ hook: false },
+					() => cli.parse_ln(ln)
+				)
 			}
 		}
 	},
 	trigger(event, ...A) {
+		if (! flag.hook) return
 		if (! Is.arr(event)) event = [ event ]
 		if (flag.debug) l.debug(`trigger ${ event.join(", ") }`)
 		return Promise.all(event
@@ -1082,7 +1163,7 @@ const wargs = (name) => ({
 		return this
 	},
 	o: {},
-	async parse(raw, is_hook) {
+	async parse(raw) {
 		if (! raw?.length) raw = process.argv.slice(2)
 
 		let mod = this.opt ? "opt" : "cmd",
@@ -1145,7 +1226,7 @@ const wargs = (name) => ({
 			if (Is.num(arg_res)) arg.push(arg.splice(arg_res))
 		}
 
-		if (! is_hook) await this.trigger("run", cmd_n, raw)
+		await this.trigger("run", cmd_n, raw)
 		await this.cmd[cmd_n]?.(...arg)
 
 		return this
@@ -1168,7 +1249,7 @@ cli.g = wargs("g")
 	.help({ themes: info.t, extra: info.g_ex })
 	.hook("run", async(C, cmd, raw) => {
 		if (C.o.version) {
-			l.log("xbqg " + version)
+			l.log("xbqg/" + version)
 			C.o.version = false
 			if (! flag.interactive) process.exit()
 		}
@@ -1197,7 +1278,7 @@ cli.g = wargs("g")
 			c.read("setting")
 
 			// Note: Load user-defined hooks.
-			if (Is.arr(c.setting?.hooks))
+			if (Is.arr(c.setting.hooks))
 				c.setting.hooks.filter(h => h?.on)?.forEach(h =>
 					C.hook(h.event,  async() => C._hook._execute(h))
 				)
@@ -1214,8 +1295,8 @@ cli.i = wargs("i")
 	})
 	.help({ extra: info.i_ex })
 	.hook("run", (_, __, raw) => history_save("!" + raw.join(" ")))
-cli.parse_ln = async (ln, is_hook) =>
-	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "), is_hook)
+cli.parse_ln = async ln =>
+	await cli[ ln[0] === "!" ? "i" : "g" ].parse(ln.replace(/^!/, "").split(" "))
 
 // :: Goodbye
 
