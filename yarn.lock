@@ -405,10 +405,10 @@ file-entry-cache@^6.0.1:
   dependencies:
     flat-cache "^3.0.4"
 
-"fkutil@>= 3.5.2":
-  version "3.5.2"
-  resolved "https://registry.yarnpkg.com/fkutil/-/fkutil-3.5.2.tgz#a54773893af449ad7ee8c34aebd7362df0b30d93"
-  integrity sha512-Rc1w8I5IcAlIPA6XEYbH8YXs9G09MqzVJZxa4fgE3vaCDHEvkkJ2WL9h0bDUF0gqLhYINSTqTY48TbhaSw9nDQ==
+"fkutil@>= 3.5.4":
+  version "3.5.4"
+  resolved "https://registry.yarnpkg.com/fkutil/-/fkutil-3.5.4.tgz#b6b2236fd351315833d7c97842443dda608b8f14"
+  integrity sha512-iZneN+0OjX5xXsfPAcwmbg187B2GqtjkfG6yjKgdv35xplCzOMjKyvp+JvKM3qa9jIu7KvYggDxXDs4McsqTTQ==
   dependencies:
     bufferhelper "^0.2.1"
     iconv-lite "^0.6.2"

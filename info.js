@@ -109,8 +109,17 @@ around <- around
         format: string
 
 bookcase <- book_show
-    useRelativeTime: boolean
-    # whether to use relative time like "3 days ago"
+    style
+        useRelativeTime: boolean
+        # whether to use relative time like "3 days ago"
+        header: boolean
+        # whether to show the table header
+        padding: array
+        # lengths of each columns, which are name, source, title and time
+            0: integer
+            1: integer
+            2: integer
+            3: integer
 
 interactive <- interactive
     prompt: string
@@ -173,6 +182,8 @@ hooks: array
         action: array
             []: string
             # a whole command, can be interactive
+        clearEOF: boolean
+        # whether to clear the last line
 
 RELAVANT
 
