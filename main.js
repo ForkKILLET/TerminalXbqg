@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.1"
+const version = "4.10.2"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -52,7 +52,7 @@ const c = {
 	read_json: n => fs.readFileSync(p_file(n), "utf8").toString(),
 	write: (n, data) => {
 		if (data) c[n] = data
-		fs.writeFileSync(p_file(n),
+		if (! flag.readonly) fs.writeFileSync(p_file(n),
 			new Uint8Array(Buffer.from(Is.str(c[n])
 				? c[n]
 				: serialize(c[n], { regexp: true, indent: 2 })
@@ -68,6 +68,7 @@ const flag = {
 	interactive: false,
 	get debug() { return cli.g.o.debug ?? false },
 	get plain() { return cli.g.o.plain ?? false },
+	get readonly() { return cli.g.o.readonly ?? false },
 	with: async (flag_, f) => {
 		for (const n in flag_) [ flag[n], flag_[n] ] = [ flag_[n], flag[n] ]
 		await f()
@@ -95,11 +96,13 @@ const fetch_alias = name => async() => {
 	l.div("page info", 0, 1)
 
 	c.read("around")
-	const page = c.around[c.setting.source.active]?.[name]
+	const a = c.around[c.setting.source.active]
+	if (! a) throw "Around not found."
 
+	const page = a[name]
 	if (page) {
 		c.read("pagewarner")
-		const today = new Date().format("yyyymmdd")
+		const today = new Date().format("yyyy-mm-dd")
 		if (Is.udf(c.pagewarner[today])) c.pagewarner[today] = 0
 		else c.pagewarner[today] += ski(name, { prev: -1, curr: 0, next: +1 })
 		c.write("pagewarner")
@@ -141,7 +144,7 @@ const find_book = (name, autoSwitching, src) => {
 	return []
 }
 const history_save = ln => {
-	if (c.setting.history?.on) {
+	if (c.setting.history.on) {
 		c.read("history")
 		c.history.push(ln)
 		c.write("history")
@@ -171,7 +174,7 @@ cmd.g = {
 		if (! page) throw "Page can't be null."
 
 		const s = c.setting.source.active, src = c.setting.source.list[s]
-		const g = c.setting.source.list?.global
+		const g = c.setting.source.list.global
 		const matcher = Object.assign({}, g.matcher, src.matcher ?? {})
 		const replacer = g.replacer.concat(src.replacer ?? [])
 		const blocks = {}
@@ -223,17 +226,14 @@ cmd.g = {
 		l.log(l.hili(chapterTitle, 3))
 		l.log(blocks.content)
 
-		const a = {
+		c.read("around")
+		const a = c.around[s] = {
 			prev: blocks.prev,
 			curr: page,
-			next: blocks.next
+			next: blocks.next,
+			title: chapterTitle,
+			time: Date.now()
 		}
-
-		c.read("around")
-		a.title = chapterTitle
-		a.time = + new Date()
-		c.around[s] = a
-
 		c.write("around")
 
 		await cmd.g.around()
@@ -251,7 +251,7 @@ cmd.g = {
 
 		const { prev, curr, next, title } = c.around[c.setting.source.active]
 		l.extlog(
-			c.setting.around?.style?.format,
+			c.setting.around.style.format,
 			"around.style.format", {
 				prev: prev ?? "null", curr, next: next ?? "null", title
 			}
@@ -282,20 +282,23 @@ cmd.g = {
 
 	book_show: () => {
 		l.div("book show", 0, 2)
+		const rows = Object.entries(c.read("books")).map(([ name, book ]) =>
+			Object.entries(book).map(([ src, { title, time, next, updated } ], k) => [
+				k ? "" : l.bold(name),
+				src,
+				l.hili(title, 3),
+				l.hili(c.setting.bookcase.style.useRelativeTime
+					? dayjs(time).fromNow()
+					: new Date(time).format("yyyy-mm-dd")
+				),
+				next ? (updated ? l.hili("√") : "") : l.hili("*", 4)
+			]
+		)).flat()
+		if (c.setting.bookcase.style.header)
+			rows.unshift([ "name", "source", "title", "time", "watch" ].map(l.bold))
 		l.log(l.table(
-			Object.entries(c.read("books")).map(([ name, book ]) =>
-				Object.entries(book).map(([ src, { title, time, next } ], k) => [
-					k ? "" : l.bold(name),
-					src,
-					l.hili(title, 3),
-					l.hili(c.setting.bookcase?.useRelativeTime
-						? dayjs(time).fromNow()
-						: new Date(time).format("yyyy-mm-dd")
-					),
-					l.hili(next ? "" : "*", 5)
-				]
-			)).flat(),
-			[ 10, 10, 60, 15 ]
+			rows,
+			c.setting.bookcase.style.padding
 		))
 		l.div("EOF", 1, 1)
 	},
@@ -304,7 +307,7 @@ cmd.g = {
 		c.read("books")
 
 		const s = c.setting.source.active
-		const re = RegExp(c.setting.source.list[s]?.matchKeyInAround)
+		const re = RegExp(c.setting.source.list[s].matchKeyInAround)
 		const key = c.around[s]?.curr.match(re)[1]
 
 		if (! key)
@@ -322,10 +325,10 @@ cmd.g = {
 
 		if (newBook && ! _name)
 			throw "Book name can't be null when adding new book."
-		if (! c.books[_name]) c.books[_name] = {}
-		c.books[_name][s] = c.around[s]
+		const a = c.books[_name] ??= {}
+		a[s] = c.around[s]
 
-		c.write("books", c.books)
+		c.write("books")
 		l.log(newBook ? "Added." : "Updated.")
 		l.div("EOF", 1, 1)
 	},
@@ -422,7 +425,7 @@ cmd.g = {
 
 		const o_s = c.setting.source.active
 
-		const lx = 10 + 10 + 60 + 15
+		const lx = c.setting.bookcase.style.padding.reduce((a, c) => a + c, 0)
 		for (let [ k, n, a, s ] of check) {
 			const draw = ch => {
 				readline.moveCursor(std.stdout, lx, - i + k - 2)
@@ -447,14 +450,19 @@ cmd.g = {
 				)
 			}
 			catch (e) { err = e }
+
 			clearInterval(sp_t)
 			l.opt.drop = false
 			if (err) draw(l.hili("!", 1))
 			else if (res.next) {
 				draw(l.hili("√"))
-				updated.push([ n, a, s ])
 				l.opt.drop = true
+
+				updated.push([ n, a, s ])
 				await cmd.g.book_mark(false)
+				c.books[n][s].updated = true
+				c.write("books")
+
 				l.opt.drop = false
 			}
 			else draw(l.hili("x", 5))
@@ -542,20 +550,20 @@ cmd.g = {
 	pagewarner_stat: () => {
 		c.read("pagewarner")
 
-		const today = new Date().format("yyyymmdd")
-		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner?.warnNum
+		const today = new Date().format("yyyy-mm-dd")
+		const n = c.pagewarner[today] ?? 0, m = c.setting.pagewarner.warnNum
 
 		l.div("pagewarner stat", 0, 2)
 		if (n <= m) {
-			if (c.setting.pagewarner?.onlyWarnAfterFetching === true) return
+			if (c.setting.pagewarner.onlyWarnAfterFetching === true) return
 
 			l.log(`Reading progress today: [${n} / ${m}]`)
 			l.log(`${m - n} page${ m - n <= 1 ? "" : "s" } left.`)
-			const L = c.setting.pagewarner?.progressStyle?.stat?.length
+			const L = c.setting.pagewarner.progressStyle.stat.length
 			let nc = parseInt(n / m * L)
 			if (nc < 0) nc = 0
 			l.extlog(
-				c.setting.pagewarner?.progressStyle?.stat?.format,
+				c.setting.pagewarner.progressStyle.stat.format,
 				"pagewarner.progressStyle.stat.format", {
 					progress: ($, f, b) =>
 						l.hili(Cc(f, $.param(0, "fore")).char().r.repeat(nc)) +
@@ -576,13 +584,13 @@ cmd.g = {
 
 		l.div("pagewarner diff", 0, 2)
 
-		const L = c.setting.pagewarner?.progressStyle?.diff?.length
+		const L = c.setting.pagewarner.progressStyle.diff.length
 		let m = L; for (let d in c.pagewarner) if (c.pagewarner[d] > m) m = c.pagewarner[d]
 
 		for (let d in c.pagewarner) {
 			const n = c.pagewarner[d]
 			l.extlog(
-				c.setting.pagewarner?.progressStyle?.diff?.format,
+				c.setting.pagewarner.progressStyle.diff.format,
 				"pagewarner.progressStyle.diff.format", {
 					date: d,
 					progress: (_, f) =>
@@ -609,14 +617,14 @@ cmd.g = {
 		rln = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
-			completer: c.setting.interactive?.allowComplete ? interactive_completer : undefined,
+			completer: c.setting.interactive.allowComplete ? interactive_completer : undefined,
 			removeHistoryDuplicates: true
 		})
 		rln.rePrompt = () => rln.setPrompt(
-			ext(c.setting.interactive?.prompt, { hili: s => l.hili(s) })
+			ext(c.setting.interactive.prompt, { hili: s => l.hili(s) })
 		)
 
-		let n = c.setting.history?.loadToInteractive
+		let n = c.setting.history.loadToInteractive
 		if (n) {
 			c.read("history")
 			rln.history = c.history.slice(- n).reverse()
@@ -630,7 +638,7 @@ cmd.g = {
 				return
 			}
 
-			if (c.setting.interactive?.allowXbqgPrefix) ln = ln?.replace(/^xbqg /, "")
+			if (c.setting.interactive.allowXbqgPrefix) ln = ln?.replace(/^xbqg /, "")
 
 			await cli.parse_ln(ln)
 
@@ -692,7 +700,7 @@ cmd.i = {
 	},
 	clear: async(_bang) => {
 		if (_bang)
-			await execa.command(c.setting.interactive?.forceClearCommand, std)
+			await execa.command(c.setting.interactive.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
 	eval: (code_) => {
@@ -717,310 +725,14 @@ cmd.i = {
 
 const opt = {}
 opt.g = {
-	version:	[ "v"	, [ "null"					], "show version." ],
-	plain:		[ "n"	, [ "boolean"				], "disable colored output" ],
-	path:		[ "p"	, [ "string",	"p_data"	], "assign data path, override `$XBQG_DATA`." ],
-	debug:		[ "d"	, [ "boolean"				], "enable debugging output" ]
+	version:	[ "v"	, [ "null"					], `show version.` ],
+	plain:		[ "n"	, [ "boolean"				], `disable colored output` ],
+	path:		[ "p"	, [ "string",	"p_data"	], `assign data path, override "${ l.hili("$XBQG_DATA", 3) }".` ],
+	debug:		[ "d"	, [ "boolean"				], `enable debugging output` ],
+	readonly:	[ "r"	, [ "boolean",				], `stop writing data to files` ]
 }
 
-const c_dft = {
-	setting: {
-	  editor: "vim ${path}",
-	  browser: null,
-	  around: {
-	    style: {
-	      format: "<< !{ green | ${prev} } | !{ yellow | ${title} } | !{ green | ${next} } >>"
-	    }
-	  },
-	  interactive: {
-	    prompt: "!{ hili | xbqg$ } ",
-	    forceClearCommand: "clear",
-	    allowXbqgPrefix: true,
-	    allowComplete: true
-	  },
-	  pagewarner: {
-	    warnNum: 20,
-	    onlyWarnAfterFetching: false,
-	    progressStyle: {
-	      stat: {
-	        length: 80,
-	        format: "[ !{ progress | # | = } ] ${percent}"
-	      },
-	      diff: {
-	        length: 80,
-	        format: "${date} | !{ progress | # } ] ${number}"
-	      }
-	    }
-	  },
-	  bookcase: {
-	    useRelativeTime: true
-	  },
-	  source: {
-	    active: "xbqg",
-	    autoSwitching: true,
-	    useCornerBracket: true,
-	    list: {
-	      "global": {
-	        matcher: {
-	          title: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<title>(.*)<\/title>/
-	          }
-	        },
-	        replacer: [
-	          [ /<br ?\/?>/, "\n" ],
-	          [ /&?amp;/, "&" ],
-	          [ /&?nbsp;/, " " ],
-	          [ /&?lt;/, "<" ],
-	          [ /&?gt;/, ">" ]
-	        ]
-	      },
-	      "xbqg": {
-	        url: "https://www.zxbiquge.com/${page}.html",
-	        matcher: {
-	          bookName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /-(.+?) - 新笔趣阁$/
-	          },
-	          chapterName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /^(.*)-/
-	          },
-	          content: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<div id="content">([^]+?)<\/div>/
-	          },
-	          around: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /=keypage;([^]+?)function keypage/
-	          },
-	          prev: {
-	            necessary: false,
-	            from: "around",
-	            regexp: /prevpage="\/(.+?).html"/
-	          },
-	          next: {
-	            necessary: false,
-	            from: "around",
-	            regexp: /nextpage="\/(.+?).html"/
-	          }
-	        },
-	        matchKeyInAround: /(.*)\//
-	      },
-	      "8wenku": {
-	        url: "http://www.8wenku.com/b/${page}.html",
-	        matcher: {
-	          bookName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /\s*(.*)_/
-	          },
-	          chapterName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /_(.*)_8文库/
-	          },
-	          content: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<div id="content">([^]+?)<\/div>/
-	          },
-	          prev: {
-	            necessary: true,
-	            from: "",
-	            regexp: /<a href="\/b\/(.+?).html">上一章<\/a>/
-	          },
-	          next: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<a href="\/b\/(.+?).html">下一章<\/a>/
-	          }
-	        },
-	        matchKeyInAround: /(.*)\//
-	      },
-	      "kenshuge": {
-	        url: "https://m.kenshuge.com/wapbook/${page}.html",
-	        matcher: {
-	          bookName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /\s*(.+?)_/
-	          },
-	          chapterName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /_(.+?)_笔趣阁/
-	          },
-	          content: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<div id="chapter_con" class="chapter_con">([^]+?)<\/div>/
-	          },
-	          prev: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<a href="\/wapbook\/(.+?)\.html">上一章<\/a>/
-	          },
-	          next: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<a href="\/wapbook\/(.+?)\.html">下一章<\/a>/
-	          }
-	        },
-	        replacer: [
-	          [ /\n{3,}/, "\n\n" ]
-	        ],
-	        matchKeyInAround: /(.*)_/
-	      },
-	      "ibiqu": {
-	        url: "http://www.ibiqu.net/book/${page}.htm",
-	        matcher: {
-	          bookName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /_(.+?)小说在线阅读/
-	          },
-	          chapterName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /^ (.+?)_/
-	          },
-	          content: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<div id="content">([^]+?)<\/div>/
-	          },
-	          prev: {
-	            necessary: false,
-	            from: "html",
-	            regexp: /<a href="\/book\/([0-9\/]+?).htm">上一章<\/a>/
-	          },
-	          next: {
-	            necessary: false,
-	            from: "html",
-	            regexp: /<a href="\/book\/([0-9\/]+?).htm">下一章<\/a>/
-	          }
-	        },
-	        replacer: [
-	          [ /<p>/, "" ],
-	          [ /<\/p>/, "\n" ],
-	          [ /一秒记住，精彩小说无弹窗免费阅读！/, "" ]
-	        ],
-	        matchKeyInAround: /(.*)\//
-	      },
-	      "tvbts": {
-	        url: "https://www.tvbts.com/${page}.html",
-	        matcher: {
-	          bookName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /_(.+?)_TVB小说网/
-	          },
-	          chapterName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /^(.+?)_/
-	          },
-	          content: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<div id="content"[^]*?>([^]+?)<\/div>/
-	          },
-	          prev: {
-	            necessary: false,
-	            from: "html",
-	            regexp: /<a href="\/([0-9_\/]+?).html" target="_top" class="pre">/
-	          },
-	          next: {
-	            necessary: false,
-	            from: "html",
-	            regexp: /<a href="\/([0-9_\/]+?).html" target="_top" class="next">/
-	          }
-	        },
-	        replacer: [
-	          [ /天才一秒记住本站地址：<a.+?<\/a>/, "" ],
-	          [ /<p style="font-size:16px;">[^]+$/, "" ],
-	          [ /转载请注明出处：<a.+?<\/a>/, "" ],
-	          [ /\S+?提示您：看后求收藏.+?，接着再看更方便。/, "" ],
-	          [ /《\S+?》来源：<a.+?<\/a>/, "" ]
-	        ],
-	        matchKeyInAround: /(.*)\//
-	      },
-	      "bookben": {
-	        url: "https://www.bookben.net/read/${page}.html",
-	        matcher: {
-	          bookName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /^(.+?)_/
-	          },
-	          chapterName: {
-	            necessary: true,
-	            from: "title",
-	            regexp: /^(.+?)_(.+)_书本网/
-	          },
-	          content: {
-	            necessary: true,
-	            from: "html",
-	            regexp: /<div id="booktxt">([^]+?)<\/div>/
-	          },
-	          prev: {
-	            necessary: false,
-	            from: "html",
-	            regexp: /<a id="prev_url" href="\/read\/([0-9\/])+.html" class="block">/
-	          },
-	          next: {
-	            necessary: false,
-	            from: "html",
-	            regexp: /<a id="next_url" href="\/read\/([0-9\/])+.html" class="block">/
-	          }
-	        }
-	      }
-	    }
-	  },
-	  history: {
-	    on: true,
-	    loadToInteractive: 10
-	  },
-	  hooks: [
-	    {
-	      on: true,
-	      name: "anti-addiction",
-	      event: [ "post-fetch" ],
-	      clearEOF: true,
-	      action: [
-	        "pagewarner_stat"
-	      ]
-	    },
-	    {
-	      on: true,
-	      name: "page-refresh",
-	      interactive: true,
-	      event: [ "pre-fetch" ],
-	      action: [
-	        "!clear !"
-	      ]
-	    },
-	    {
-	      on: true,
-	      name: "auto-bookmark",
-	      event: [ "pre-book_fetch" ],
-	      action: [
-	        "book_mark !"
-	      ]
-	    }
-	  ]
-	},
-	history: [ "help" ],
-	around: {},
-	books: {},
-	pagewarner: {}
-}
+const c_dft = require("./default_config.js")
 
 // :: Wargs
 
@@ -1081,14 +793,12 @@ const wargs = (name) => ({
 
 			if (! _theme) {
 				if (this.has_option) txt = "OPTIONS\n\n"
-					+ l.table(Object.entries(this.opt).map(([ k, v ]) => {
-						const bool = v[1][0] === "boolean"
-						return [
-							"--" + l.hili(k) +  " | -" + l.hili(v[0]) + (bool ? `[${ l.hili("!") }]` : ""),
-							v[2] + (bool ? ", toggle with a bang `!`." : "")
-						]
-					}), [ 25 ])
-					+ "\n\n"
+					+ l.table(Object.entries(this.opt).map(([ k, v ]) => [
+						"--" + l.hili(k) +  " | -" + l.hili(v[0]) + (v[1][0] === "boolean" ? `[${ l.hili("!") }]` : ""),
+						v[1][1] ? `<${ l.hili(v[1][1]) }>` : "",
+						v[2]
+					]), [ 30, 25 ])
+					+ `\n\nBoolean options can be toggled with "${ l.hili("!", 3) }".\n\n`
 				txt	+= "COMMANDS\n\n"
 					+ l.table(
 						Object.entries(this.info).map(([ k, v ]) => {
@@ -1121,7 +831,7 @@ const wargs = (name) => ({
 		return this
 	},
 	_hook: {
-		_find: name => c.setting.hooks?.find(h => h?.name === name),
+		_find: name => c.setting.hooks.find(h => h?.name === name),
 		_execute: async h => {
 			if (! h) return
 			if (flag.interactive || ! h?.interactive) {
@@ -1266,8 +976,8 @@ cli.g = wargs("g")
 				if (cmd === "help") return
 				l.div("lauch", 0, 2)
 				l.fatal(
-					"Please set the environment variable `$XBQG_DATA` to a non-root dir.\n" +
-					"Or use `xbqg --path <p_data>` to assign it."
+					`Please set the environment variable "$XBQG_DATA" to a non-root dir.\n` +
+					`Or use "xbqg --path <p_data>" to assign it.`
 				)
 			}
 
@@ -1279,7 +989,7 @@ cli.g = wargs("g")
 
 			// Note: Load user-defined hooks.
 			if (Is.arr(c.setting.hooks))
-				c.setting.hooks.filter(h => h?.on)?.forEach(h =>
+				c.setting.hooks.filter(h => h?.on).forEach(h =>
 					C.hook(h.event,  async() => C._hook._execute(h))
 				)
 		}
