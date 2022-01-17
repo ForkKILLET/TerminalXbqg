@@ -56,7 +56,7 @@ module.exports = {
 	        ]
 	      },
 	      "xbqg": {
-	        url: "http://www.zxbiquge.com/${page}.html",
+	        url: "https://www.biqupai.com/${page}.html",
 	        matcher: {
 	          bookName: {
 	            necessary: true,
