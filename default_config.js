@@ -31,7 +31,11 @@ module.exports = {
 	    style: {
 	      useRelativeTime: true,
 		  header: true,
-	      padding: [ 10, 10, 40, 20 ]
+	      padding: [ 10, 10, 40, 20 ],
+	      watchSpinner: {
+            characters: "/-\\|",
+            delay: 300
+          }
 	    }
 	  },
 	  source: {
