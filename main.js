@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.2"
+const version = "4.10.3"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -175,7 +175,7 @@ cmd.g = {
 
 		const s = c.setting.source.active, src = c.setting.source.list[s]
 		const g = c.setting.source.list.global
-		const matcher = Object.assign({}, g.matcher, src.matcher ?? {})
+		const matcher = { ...g.matcher, ...src.matcher }
 		const replacer = g.replacer.concat(src.replacer ?? [])
 		const blocks = {}
 
@@ -206,7 +206,7 @@ cmd.g = {
 
 		for (let i in matcher) {
 			const m = matcher[i]
-			blocks[i] = blocks[m.from]?.match(RegExp(m.regexp))?.[m.group ?? 1]
+			blocks[i] = blocks[m.from]?.match(RegExp(m.regexp))?.[m.group ?? 1] ?? null
 			if (m.necessary && ! blocks[i]) {
 				l.log(blocks)
 				throw l.hiqt`Block ${i} mismatched.`
@@ -283,7 +283,9 @@ cmd.g = {
 	book_show: () => {
 		l.div("book show", 0, 2)
 		const rows = Object.entries(c.read("books")).map(([ name, book ]) =>
-			Object.entries(book).map(([ src, { title, time, next, updated } ], k) => [
+			Object.entries(book).map(([
+				src, { title, time, next, updated, unwatch }
+			], k) => [
 				k ? "" : l.bold(name),
 				src,
 				l.hili(title, 3),
@@ -291,7 +293,9 @@ cmd.g = {
 					? dayjs(time).fromNow()
 					: new Date(time).format("yyyy-mm-dd")
 				),
-				next ? (updated ? l.hili("√") : "") : l.hili("*", 4)
+				next
+					? (updated ? l.hili("√") : "")
+					: (unwatch ? l.hili("#", 5) : l.hili("*", 4))
 			]
 		)).flat()
 		if (c.setting.bookcase.style.header)
@@ -326,7 +330,7 @@ cmd.g = {
 		if (newBook && ! _name)
 			throw "Book name can't be null when adding new book."
 		const a = c.books[_name] ??= {}
-		a[s] = c.around[s]
+		a[s] = { ...a[s], ...c.around[s], updated: undefined }
 
 		c.write("books")
 		l.log(newBook ? "Added." : "Updated.")
@@ -419,7 +423,7 @@ cmd.g = {
 		let i = 0
 		for (const n in c.books) for (const s in c.books[n]) {
 			const a = c.books[n][s]
-			if (! a.next) check.push([ i, n, a, s ])
+			if (! a.next && ! a.unwatch) check.push([ i, n, a, s ])
 			i ++
 		}
 
@@ -433,13 +437,13 @@ cmd.g = {
 				readline.moveCursor(std.stdout, - lx - 1, i - k + 2)
 			}
 
-			const spinner = "/-\\|"
+			const { characters, delay } = c.setting.bookcase.style.watchSpinner
 			let sp_i = 0, sp_t = setInterval(() => {
 				l.opt.drop = false
-				draw(l.hili(spinner[sp_i], 4))
+				draw(l.hili(characters[sp_i], 4))
 				l.opt.drop = true
-				if (++ sp_i === spinner.length) sp_i = 0
-			}, 300)
+				if (++ sp_i === characters.length) sp_i = 0
+			}, delay)
 
 			l.opt.drop = true
 			c.setting.source.active = s
@@ -475,8 +479,27 @@ cmd.g = {
 		l.div("EOF", 1, 1)
 	},
 
-	watch_toggle: () => {
+	watch_toggle: (name, _src) => {
+		l.div("watch toggle", 0, 2)
 
+		const [ n, a, s, book ] = find_book(name, false, _src)
+		let r
+		if (n) {
+			if (a) {
+				r = a.unwatch = ! a.unwatch
+			}
+			else if (_src === "all") {
+				for (const s in book) {
+					const a = book[s]
+					a.unwatch = r ??= ! a.unwatch
+				}
+			}
+		}
+		else throw "Book not found."
+
+		c.write("books")
+		l.log(`${ r ? "Disabled" : "Enabled" } in ` + (s === "all" ? l.bold("ALL") + " sources." : l.hiqt`${s} source.`))
+		l.div("EOF", 1, 1)
 	},
 
 	config: (_path, _action, _val_) => {

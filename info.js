@@ -21,8 +21,10 @@ info.g = {
 	book_fetch:			[ [ "b",	"@"		], [ `Fetch the page you read before of a <name>d book in your bookcase.` ] ],
 	book_browse:		[ [ "bb",	"@!"	], [ `Open the current page in your browser` ] ],
 	watch:				[ [ "w",	".."	], [ `Watch update in the bookcase. Marks:`,
-												 `"*" = to watch, "x" = no update, "√" = updated, "!" = error` ] ],
-	watch_toggle:		[ [ "wt",	"..="	], [ "WIP" ] ],
+												 `"*" = to watch, "#" = unwatch,`,
+												 `"x" = no update, "√" = updated, "!" = error` ] ],
+	watch_toggle:		[ [ "wt",	"..="	], [ "Toggle watching on a <name>d book in [src].",
+												 `When [src] is "all", toggle all sources synchronously.` ] ],
 	config:				[ [ "c",	"%"		], [ `Print the whole configuration when no arguments is given.`,
 												 `Print a specific item by the given JSON <path>.`,
 												 `e.g. "config a.b[42].c"`,
@@ -120,6 +122,11 @@ bookcase <- book_show
             1: integer
             2: integer
             3: integer
+        watchSpinner
+        # the spinner displaying when watching
+            characters: string
+            delay: integer
+            # how soon to show the next character
 
 interactive <- interactive
     prompt: string
