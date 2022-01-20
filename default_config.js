@@ -70,7 +70,7 @@ module.exports = {
 	          chapterName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /^(.*)-/
+	            regexp: /^(.+?)-/
 	          },
 	          content: {
 	            necessary: true,
