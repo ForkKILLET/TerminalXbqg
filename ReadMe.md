@@ -2,6 +2,10 @@
 
 [简体中文](ReadMe.zh-Hans.md) | [English](ReadMe.md)
 
+## Background
+
+I once had a Macbook and it broke down. I managed to enter Recovery mode and happily found Terminal.app and Safari there. But that Safari was too old so I wrote a [bash script](https://github.com/TerminalXbqgBash) to read novel. I thought reading in a terminal is nice so I migrate the script to node.js and added some awesome features after I got a new laptop.
+
 ## Install
 
 1. Download
