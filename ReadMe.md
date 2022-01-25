@@ -40,7 +40,17 @@ I once had a Macbook and it broke down. I managed to enter Recovery mode and hap
 
    Add this to the profile too.
 
-# FAQ
+## FAQ
+
+- Q: How to add a book?
+
+  A: 1. First, choose a source. You can run `xbqg config source.list` to get the source list.  
+        As for me, [ibiqu](https://www.ibiqu.net) works well, so I'll use it as an example.
+     2. Run `xbqg source ibiqu` to switch the source. (This step will be unnecessary after adding a book mark because TerminalXbqg supports automatical source switching.)
+     3. Suggest you're going to read _诡秘之主 (Lord of the Mysteries)_, then open the brower and [search](http://www.ibiqu.net/modules/article/search.php?searchkey=%E8%AF%A1%E7%A7%98%E4%B9%8B%E4%B8%BB) it. (Biquge site group mostly support seacrhing). Then enter chapter 1. Now the URL is <http://www.ibiqu.net/book/94525/153378216.htm> and you need to copy page ID in that address, i.e. `94525/153378216`。
+     4. Run `xbqg fetch 52542/20380548` to fetch the chapter. Then you can close the brower and enjoy the immersive experience of reading in terminal.
+     5. Some commands you may need: `fetch_prev(p, [)` & `fetch_next(n, ])` to turn page, `book_mark` to add books to your bookcase，`book_show` to show the bookcase，`watch` update, `interactive` mode, etc. There are two short forms (letter and symbol) of each commands for quick input. You can run `help` to get information of all commands, or `help watch` and more to get information about a specific command.
+     5. Happy reading!
 
 - Q: Why does the text contain weird characters?
 
@@ -68,7 +78,7 @@ I once had a Macbook and it broke down. I managed to enter Recovery mode and hap
 
   **Require node.js > v16.**
 
-# Screenshots
+## Screenshots
 
 - `interactive (!)` and `watch (..)`
 
@@ -82,5 +92,5 @@ I once had a Macbook and it broke down. I managed to enter Recovery mode and hap
 
   ![sc-3](https://s2.loli.net/2022/01/16/aVHK9yPNThLuAks.png)
 
-# EOF
+## EOF
 
