@@ -6,7 +6,7 @@
   "dependencies": {
     "dayjs": "^1.10.7",
     "execa": "^4.1.0",
-    "fkutil": ">= 3.5.4",
+    "fkutil": ">= 3.5.5",
     "open": "^8.0.2"
   },
   "devDependencies": {
