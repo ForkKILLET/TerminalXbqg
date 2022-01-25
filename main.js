@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.3"
+const version = "4.10.4"
 
 const fs			= require("fs")
 const execa			= require("execa")
