@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.4"
+const version = "4.10.5"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -320,7 +320,7 @@ cmd.g = {
 
 		l.div("book mark", 0, 2)
 
-		let newBook = false
+		let newBook = true
 		for (let i in c.books)
 			if (c.books[i][s]?.curr.match(re)[1] === key) {
 				newBook = false
