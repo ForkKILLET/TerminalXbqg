@@ -4,7 +4,7 @@
 
 ## 背景
 
-​		我曾经拥有一台 Macbook 但它坏了。我成功进入恢复模式然后开心地看到有 Terminal.app 和 Safari 可以用。但那 Safari 太旧了，于是我写了一个 [bash 脚本](https://github.com/TerminalXbqgBash) 来看小说。我寻思在终端看小说很棒，所以拿到新笔记本之后就把这个脚本迁移到了 node.js 并做了些很酷的新功能。
+	我曾经拥有一台 Macbook 但它坏了。我成功进入恢复模式然后开心地看到有 Terminal.app 和 Safari 可以用。但那 Safari 太旧了，于是我写了一个 [bash 脚本](https://github.com/TerminalXbqgBash) 来看小说。我寻思在终端看小说很棒，所以拿到新笔记本之后就把这个脚本迁移到了 node.js 并做了些很酷的新功能。
 
 ## 安装
 
@@ -45,7 +45,8 @@
 
 - Q: 该怎么添加小说呢？
 
-  A: 1. 选一个源（source）。您可 `xbqg config source.list` 以检查源列表。我个人用下来 [ibiqu](https://www.ibiqu.net) 质量比较高，接下来以它为例。
+  A:
+     1. 选一个源（source）。您可 `xbqg config source.list` 以检查源列表。我个人用下来 [ibiqu](https://www.ibiqu.net) 质量比较高，接下来以它为例。
      2. `xbqg source ibiqu` 以切换源。（加入书签之后就可以省略这个步骤，TerminalXbqg 支持自动换源）
      3. 假设您要看《诡秘之主》，那么打开浏览器，在 ibiqu [搜索](http://www.ibiqu.net/modules/article/search.php?searchkey=%E8%AF%A1%E7%A7%98%E4%B9%8B%E4%B8%BB) 它（笔趣阁站群大多支持搜索功能），然后进入其第一章。此时可以看到地址是 <http://www.ibiqu.net/book/94525/153378216.htm>，您需要复制地址中章节编号即 `94525/153378216`。
      4. `xbqg fetch 52542/20380548` 以获取本章内容。随后可以关闭浏览器，体验终端沉浸阅读。
@@ -68,10 +69,10 @@
 
   A: 抱歉，我只在这些环境中测试过它：
 
-    - Archlinux 5.10.14-arch1-1 (tty & Konsole)
+  - Archlinux 5.10.14-arch1-1 (tty & Konsole)
   - MacOS Catalina (Terminal.app)
-    - MacOS Catalina Recovery (Terminal.app)
-    - Windows 10 (Git bash)
+  - MacOS Catalina Recovery (Terminal.app)
+  - Windows 10 (Git bash)
   
 您可以在[这](https://github.com/ForkKILLET/TerminalXbqg/issues)提 issue。
   
