@@ -760,7 +760,7 @@ opt.g = {
 	readonly:	[ "r"	, [ "boolean",				], `stop writing data to files` ]
 }
 
-const c_dft = require("./default_config.js")
+let c_dft = require("./default_config.js")
 
 // :: Wargs
 
