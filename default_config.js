@@ -306,11 +306,12 @@ module.exports = {
 	      name: "reload-default-config",
 	      event: [ "pre-config_reset" ],
 	      action: [
-	        "!eval "
+	        "!eval ! "
 	        +   "delete require.cache["
 	        +       "Object.keys(require.cache).find(fp => fp.endsWith(\"default_config.js\"))"
 	        +   "]",
-	        "!eval c_dft = require(\"./default_config.js\")"
+	        "!eval ! c_dft = require(\"./default_config.js\")",
+	        "!eval ! l.dbg(\"re-req default_config\")"
 	      ]
 	    }
 	  ]

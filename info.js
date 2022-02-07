@@ -51,11 +51,11 @@ info.g = {
 }
 
 info.i = {
-	exit:		[ [ "e",	"!"	], [ "Exit the interactive-mode." ] ],
-	clear:		[ [ "c",	"-" ], [ "Clear the console." ] ],
-	eval:		[ [ "v",	"+"	], [ "Run Javascript code." ] ],
-	shell:		[ [ "s",	"$"	], [ "Run command in shell." ] ],
-	help:		[ [ "h",	"?" ], [ "Show help of the given <theme> or command name." ] ],
+	exit:		[ [ "e",	"!"	], [ `Exit the interactive-mode.` ] ],
+	clear:		[ [ "c",	"-" ], [ `Clear the console.` ] ],
+	eval:		[ [ "v",	"+"	], [ `Run Javascript code. Add "!" to mute.` ] ],
+	shell:		[ [ "s",	"$"	], [ `Run command in shell.` ] ],
+	help:		[ [ "h",	"?" ], [ `Show help of the given <theme> or command name.` ] ],
 }
 
 const color_info = s => {

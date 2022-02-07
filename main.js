@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.6"
+const version = "4.10.7"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -29,7 +29,10 @@ const l = Logger({
 		bold: (_, s) => l.bold(s)
 	}
 }).bind()
-l.debug	= (...msg) => flag.debug && l.log(l.hili("xbqg%"), ...msg)
+l.dbg = (...msg) => {
+	l.opt.debug = flag.debug
+	l.debug(l.hili("xbqg%"), ...msg)
+}
 l.clearEOF = () => {
 	if (l.opt.drop) return
 	readline.moveCursor(std.stdout, 0, -1)
@@ -46,7 +49,7 @@ const std = {
 const c = {
 	read: (n, force) => {
 		if (force && c[n]) return c[n]
-		l.debug(`read ${n}`)
+		l.dbg(`read ${n}`)
 		return c[n] = JSON.parse(fs.readFileSync(p_file(n), "utf8").toString())
 	},
 	read_json: n => fs.readFileSync(p_file(n), "utf8").toString(),
@@ -57,7 +60,7 @@ const c = {
 				? c[n]
 				: serialize(c[n], { regexp: true, indent: 2 })
 			)), "utf8")
-		l.debug(`write ${n}`)
+		l.dbg(`write ${n}`)
 	}
 }
 
@@ -731,7 +734,8 @@ cmd.i = {
 			await execa.command(c.setting.interactive.forceClearCommand, std)
 		else rln.write(null, { ctrl: true, name: 'l' })
 	},
-	eval: (code_) => {
+	eval: (_bang, code_) => {
+		if (_bang) l.opt.drop = true
 		l.div("evaluate", 0, 1)
 		try {
 			l.log(eval(code_.join(" ")))
@@ -740,6 +744,7 @@ cmd.i = {
 			l.warn(e)
 		}
 		l.div("EOF", 0, 1)
+		if (_bang) l.opt.drop = false
 	},
 	shell: async(code_) => {
 		l.div("shell", 0, 1)
@@ -840,7 +845,7 @@ const wargs = (name) => ({
 					)
 					+ (extra ? "\n\n" + extra.trim() : "")
 			}
-			else if (ext = themes[_theme]) {
+			else if (ext = themes?.[_theme]) {
 				txt = _theme.toUpperCase() + "\n\n" + ext.trim()
 			}
 			else {
@@ -873,7 +878,7 @@ const wargs = (name) => ({
 	trigger(event, ...A) {
 		if (! flag.hook) return
 		if (! Is.arr(event)) event = [ event ]
-		if (flag.debug) l.debug(`trigger ${ event.join(", ") }`)
+		if (flag.debug) l.dbg(`trigger ${ event.join(", ") }`)
 		return Promise.all(event
 			.filter(e => this._hook[e])
 			.map(e =>
