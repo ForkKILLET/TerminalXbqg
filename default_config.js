@@ -52,6 +52,8 @@ module.exports = {
 	          }
 	        },
 	        replacer: [
+	          [ /<p>\s*/, "    " ],
+	          [ /<\/p>/, "\n" ],
 	          [ /<br ?\/?>/, "\n" ],
 	          [ /&?amp;/, "&" ],
 	          [ /&?nbsp;/, " " ],
@@ -190,11 +192,8 @@ module.exports = {
 	          }
 	        },
 	        replacer: [
-	          [ /<p>/, "" ],
-	          [ /<\/p>/, "\n" ],
 	          [ /一秒记住，精彩小说无弹窗免费阅读！/, "" ],
-	          [ /谷<\/span>/, "" ],
-	          [ /\n\u3000{2}：/, "" ]
+	          [ /谷<\/span>/, "" ]
 	        ],
 	        matchKeyInAround: /(.*)\//
 	      },
@@ -247,7 +246,8 @@ module.exports = {
 	          chapterName: {
 	            necessary: true,
 	            from: "title",
-	            regexp: /^(.+?)_(.+)_书本网/
+	            regexp: /^.+?_(.+?)(章节免费阅读无弹窗)?_书本网/,
+	            group: 1
 	          },
 	          content: {
 	            necessary: true,
@@ -257,14 +257,15 @@ module.exports = {
 	          prev: {
 	            necessary: false,
 	            from: "html",
-	            regexp: /<a id="prev_url" href="\/read\/([0-9\/])+.html" class="block">/
+	            regexp: /<a id="prev_url".*href="\/read\/(.+?)\.html"/
 	          },
 	          next: {
 	            necessary: false,
 	            from: "html",
-	            regexp: /<a id="next_url" href="\/read\/([0-9\/])+.html" class="block">/
+	            regexp: /<a id="next_url".*href="\/read\/(.+?)\.html"/
 	          }
-	        }
+	        },
+	        matchKeyInAround: /(.*)\//
 	      }
 	    }
 	  },
@@ -297,6 +298,19 @@ module.exports = {
 	      event: [ "pre-book_fetch" ],
 	      action: [
 	        "book_mark !"
+	      ]
+	    },
+	    {
+	      on: false,
+	      interactive: true,
+	      name: "reload-default-config",
+	      event: [ "pre-config_reset" ],
+	      action: [
+	        "!eval "
+	        +   "delete require.cache["
+	        +       "Object.keys(require.cache).find(fp => fp.endsWith(\"default_config.js\"))"
+	        +   "]",
+	        "!eval c_dft = require(\"./default_config.js\")"
 	      ]
 	    }
 	  ]
