@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.5"
+const version = "4.10.6"
 
 const fs			= require("fs")
 const execa			= require("execa")
@@ -87,9 +87,13 @@ const cmd = {}
 const int_sleep = sec => new Promise((res, rej) => {
 	int_s.push(() => {
 		clearTimeout(t)
+		int_s.pop()
 		rej("Interrupted.")
 	})
-	const t = setTimeout(res, sec * 1000)
+	const t = setTimeout(() => {
+		int_s.pop()
+		res()
+	}, sec * 1000)
 })
 
 const fetch_alias = name => async() => {
@@ -202,6 +206,9 @@ cmd.g = {
 				const msg = err.message ?? String(err)
 				throw msg.endsWith(".") ? msg : msg + "."
 			}
+		}
+		finally {
+			int_s.pop()
 		}
 
 		for (let i in matcher) {
@@ -530,19 +537,17 @@ cmd.g = {
 		}
 	},
 	config_edit: async(_file) => {
-		const path = p_data + "/" + (_file ?? "setting") + ".json"
+		const path = p_data + "/" + (_file ??= "setting") + ".json"
 		const editor = ext(c.setting.editor, { path })
 
 		l.div("config edit", 0, 2)
 		l.log("Running " + l.hili("$ " + editor))
 
-		try {
-			if (flag.interactive) rln.pause()
-			await execa.command(editor, std)
-			if (flag.interactive) rln.resume()
-		}
-		catch {}
+		if (flag.interactive) rln.pause()
+		await execa.command(editor, std)
+		if (flag.interactive) rln.resume()
 
+		c.read(_file)
 		l.log(`Done.`)
 		l.div("EOF", 1, 1)
 	},

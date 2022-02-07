@@ -4,7 +4,7 @@
 
 ## 背景
 
-	我曾经拥有一台 Macbook 但它坏了。我成功进入恢复模式然后开心地看到有 Terminal.app 和 Safari 可以用。但那 Safari 太旧了，于是我写了一个 [bash 脚本](https://github.com/TerminalXbqgBash) 来看小说。我寻思在终端看小说很棒，所以拿到新笔记本之后就把这个脚本迁移到了 node.js 并做了些很酷的新功能。
+　　我曾经拥有一台 Macbook 但它坏了。我成功进入恢复模式然后开心地看到有 Terminal.app 和 Safari 可以用。但那 Safari 太旧了，于是我写了一个 [bash 脚本](https://github.com/TerminalXbqgBash) 来看小说。我寻思在终端看小说很棒，所以拿到新笔记本之后就把这个脚本迁移到了 node.js 并做了些很酷的新功能。
 
 ## 安装
 
@@ -23,7 +23,7 @@
 
    ```plain
    $ alias xbqg="/path/to/TerminalXbqg/main.js"
-   ```
+   ```　
 
    或者
 
