@@ -2,7 +2,7 @@
 
 // :: Dep
 
-const version = "4.10.7"
+const { version }	= require("./package.json")
 
 const fs			= require("fs")
 const execa			= require("execa")

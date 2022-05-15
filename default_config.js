@@ -30,12 +30,12 @@ module.exports = {
 	  bookcase: {
 	    style: {
 	      useRelativeTime: true,
-		  header: true,
+	      header: true,
 	      padding: [ 10, 10, 40, 20 ],
 	      watchSpinner: {
-            characters: "/-\\|",
-            delay: 300
-          }
+	        characters: "/-\\|",
+	        delay: 300
+	      }
 	    }
 	  },
 	  source: {
@@ -266,7 +266,39 @@ module.exports = {
 	          }
 	        },
 	        matchKeyInAround: /(.*)\//
-	      }
+	      },
+	      "yingsx": {
+	        url: "https://www.yingsx.com/${page}.html",
+	        matcher: {
+	          bookName: {
+	            necessary: true,
+	            from: "title",
+	            regexp: /^(.+?)_/
+	          },
+	          chapterName: {
+	            necessary: true,
+	            from: "title",
+	            regexp: /^.+?_ (.+?)-笔趣阁/,
+	            group: 1
+	          },
+	          content: {
+	            necessary: true,
+	            from: "html",
+	            regexp: /<div id="content">([^]+?)<\/div>/
+	          },
+	          prev: {
+	            necessary: false,
+	            from: "html",
+	            regexp: /<a href="\/([\d\/_]+?)\.html">上一章<\/a>/
+	          },
+	          next: {
+	            necessary: false,
+	            from: "html",
+	            regexp: /<a href="\/([\d\/_]+?)\.html">下一章<\/a>/
+	          }
+	        },
+	        matchKeyInAround: /(.*)\//
+	      },
 	    }
 	  },
 	  history: {
