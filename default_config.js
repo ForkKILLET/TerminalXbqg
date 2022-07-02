@@ -299,6 +299,37 @@ module.exports = {
 	        },
 	        matchKeyInAround: /(.*)\//
 	      },
+		  "wzxmt": {
+			url: "https://www.wzxmt.com/read/${page}.html",
+			matcher: {
+			  bookName: {
+				necessary: true,
+				from: "title",
+				regexp: /_(.+?)_笔趣阁/
+			  },
+			  chapterName: {
+				necessary: true,
+				from: "title",
+				regexp: /^(.+?)_/
+			  },
+			  content: {
+				necessary: true,
+				from: "html",
+				regexp: /下一章<\/a><\/div>([^]+?)<div class="read_btn"/
+			  },
+			  prev: {
+				necessary: false,
+				from: "html",
+				regexp: /<a href="\/read\/([0-9_\/]+?).html">上一章<\/a>/
+			  },
+			  next: {
+				necessary: false,
+				from: "html",
+				regexp: /<a href="\/read\/([0-9_\/]+?).html">下一章<\/a>/
+			  }
+			},
+			matchKeyInAround: /.*(?=\/)/
+		  },
 	    }
 	  },
 	  history: {
