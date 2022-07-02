@@ -10,7 +10,7 @@ I once had a Macbook and it broke down. I managed to enter Recovery mode and hap
 
 1. Download
 	```plain
-	$ git clone https://github.com/ForkFG/TerminalXbqg.git
+	$ git clone https://github.com/ForkKILLET/TerminalXbqg.git
 	$ cd TerminalXbqg
 	$ yarn
 	$ chmod 755 main.js # if necessary

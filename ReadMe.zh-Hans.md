@@ -11,7 +11,7 @@
 1. 下载
 
    ```plain
-   $ git clone https://github.com/ForkFG/TerminalXbqg.git
+   $ git clone https://github.com/ForkKILLET/TerminalXbqg.git
    $ cd TerminalXbqg
    $ yarn
    $ chmod 755 main.js # 如有需要

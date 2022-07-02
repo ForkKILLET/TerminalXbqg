@@ -68,7 +68,7 @@ const color_info = s => {
 info.g_ex = color_info(`
 CONTACT
 
-GitHub Issue         "https://github.com/ForkFG/TerminalXbqg/issues"
+GitHub Issue         "https://github.com/ForkKILLET/TerminalXbqg/issues"
 Email                "fork_killet@qq.com"
 
 RELAVANT
