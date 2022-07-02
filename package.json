@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ForkFG/TerminalXbqg.git"
+    "url": "git+https://github.com/ForkKILLET/TerminalXbqg.git"
   },
   "keywords": [
     "terminal",
@@ -26,7 +26,7 @@
   "author": "ForkKILLET",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ForkFG/TerminalXbqg/issues"
+    "url": "https://github.com/ForkKILLET/TerminalXbqg/issues"
   },
-  "homepage": "https://github.com/ForkFG/TerminalXbqg#readme"
+  "homepage": "https://github.com/ForkKILLET/TerminalXbqg#readme"
 }
